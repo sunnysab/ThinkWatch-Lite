@@ -782,7 +782,8 @@ export type ConfigFixKind = "unknown_value" | "unknown_field";
 /**
  * 一版配置是谁写的。
  */
-export type ConfigOrigin = "ui" | "cli" | "external" | "rollback" | "rotation" | "defaults";
+// TEMP until core v0.77: `rollback` 删掉，加 sync / import / restore / repair（同步与备份约定 2.1）
+export type ConfigOrigin = "ui" | "cli" | "external" | "rotation" | "defaults" | "sync" | "import" | "restore" | "repair";
 
 /**
  * 改配置。
@@ -5576,6 +5577,172 @@ error?: Msg | null, };
 // The body of every non-2xx control-plane response.
 export type ErrorBody = Msg;
 
+// ---------------------------------------------------------------------------
+// TEMP until core v0.77: 配置包、导入导出与备份（同步与备份约定 2.1，core 分支 `feat/pack-backup`）。
+// 按约定手写，钉上 v0.77 后重新生成整份文件，这一段随之换成生成的。
+// ---------------------------------------------------------------------------
+
+// TEMP until core v0.77
+export type JsonValue = number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null;
+
+// TEMP until core v0.77
+export type ItemKind = "provider" | "proxy" | "key" | "alias" | "group" | "route" | "price_sheet" | "security_rule" | "plugin" | "route_order" | "global" | "client_prefs";
+
+// TEMP until core v0.77
+/**
+ * 配置里的一个项目：上游、出站代理、网关密钥…… `global` 的名字是节名（failover / security /
+ * default_route / default_key / client_probes / pricing），`security_rule` 是「分项/规则名」，
+ * `route_order`、`client_prefs` 的名字是空串
+ */
+export type ItemRef = { kind: ItemKind, name: string, };
+
+// TEMP until core v0.77
+/**
+ * 一个项目和它引用的项目（路由 → 上游、上游 → 出站代理……）
+ */
+export type ItemNode = { item: ItemRef, refs: Array<ItemRef>, };
+
+// TEMP until core v0.77
+export type ExportScope = "all" | { "items": Array<ItemRef> };
+
+// TEMP until core v0.77
+export type ExportRequest = { scope: ExportScope, 
+/**
+ * 包含密钥（上游密钥、请求头值、AWS 凭据、代理密码、网关密钥）
+ */
+secrets: boolean, 
+/**
+ * 以口令加密。null = 不加密
+ */
+passphrase: string | null, 
+/**
+ * 远程模式下 Lite 附加的通用偏好。本机模式是 null（core 自己有）
+ */
+client_prefs: JsonValue | null, };
+
+// TEMP until core v0.77
+/**
+ * 一个配置包的内容（Base64）和建议的文件名
+ */
+export type ExportedFile = { file_name: string, data_b64: string, 
+/**
+ * 实际导出的项目（含随附的）
+ */
+included: Array<ItemRef>, 
+/**
+ * 不随文件导出的登录（ChatGPT 上游的名字）
+ */
+omitted_logins: Array<string>, };
+
+// TEMP until core v0.77
+export type ImportSource = { data_b64: string, passphrase: string | null, };
+
+// TEMP until core v0.77
+export type PackKind = "full" | "partial";
+
+// TEMP until core v0.77
+export type PackOrigin = "export" | "share" | "ui" | "cli" | "external" | "defaults" | "sync" | "import" | "restore" | "repair";
+
+// TEMP until core v0.77
+export type PackCounts = { providers: number, clients: number, plugins: number, routes: number, };
+
+// TEMP until core v0.77
+/**
+ * 配置包的说明（manifest）
+ */
+export type PackInfo = { kind: PackKind, created_at_ms: number, core_version: string, secrets: boolean, encrypted: boolean, origin: PackOrigin, counts: PackCounts, };
+
+// TEMP until core v0.77
+export type ImportStatus = "new" | "same" | "conflict" | "error";
+
+// TEMP until core v0.77
+export type ImportFlag = "missing_key" | "needs_login" | "plugin_disabled";
+
+// TEMP until core v0.77
+export type ImportRow = { item: ItemRef, status: ImportStatus, 
+/**
+ * 全局设置的一节：冲突时只能覆盖或跳过
+ */
+global: boolean, flags: Array<ImportFlag>, 
+/**
+ * 冲突时哪几个合并单位不同（上游是 conn / models / billing / other，别的是 all 或字段路径）
+ */
+differs: Array<string>, 
+/**
+ * 改名导入时建议的名字
+ */
+suggested_name: string | null, 
+/**
+ * `error` 时的原因
+ */
+error: Msg | null, };
+
+// TEMP until core v0.77
+export type ImportPreview = { manifest: PackInfo, 
+/**
+ * 预览时的配置版本。导入时带回去：之间配置被改过就拒绝，重新预览
+ */
+base_version: string, rows: Array<ImportRow>, };
+
+// TEMP until core v0.77
+export type ImportAction = "import" | "overwrite" | "rename" | "skip";
+
+// TEMP until core v0.77
+export type ImportDecision = { item: ItemRef, action: ImportAction, new_name?: string | null, };
+
+// TEMP until core v0.77
+export type ImportRequest = { data_b64: string, passphrase: string | null, base_version: string, decisions: Array<ImportDecision>, };
+
+// TEMP until core v0.77
+export type BackupCounts = { providers: number, plugins: number, };
+
+// TEMP until core v0.77
+/**
+ * 一个备份版本。本机与同步位置的同一版本合成一行（`local`、`sync` 都是 true）
+ */
+export type BackupEntry = { id: string, at_ms: number, origin: PackOrigin, 
+/**
+ * 同步来的版本是哪台设备写的
+ */
+device: string | null, local: boolean, sync: boolean, counts: BackupCounts, core_version: string, 
+/**
+ * 就是现在的配置
+ */
+current: boolean, };
+
+// TEMP until core v0.77
+export type BackupFileRequest = { id: string, passphrase: string | null, };
+
+// TEMP until core v0.77
+export type BackupId = { id: string, };
+
+// TEMP until core v0.77
+export type RestoreChange = "add" | "remove" | "modify";
+
+// TEMP until core v0.77
+export type RestoreKept = "key_in_use";
+
+// TEMP until core v0.77
+export type RestoreRow = { item: ItemRef, change: RestoreChange, 
+/**
+ * 要删的网关密钥本机的客户端正在用：保留，不删
+ */
+kept: RestoreKept | null, };
+
+// TEMP until core v0.77
+export type RestorePreview = { base_version: string, rows: Array<RestoreRow>, 
+/**
+ * 开着同步时，恢复的结果会同步到几台其他设备
+ */
+sync_devices: number, };
+
+// TEMP until core v0.77
+export type RestoreRequest = { id: string, base_version: string, 
+/**
+ * 只恢复这几项。null = 全部
+ */
+items: Array<ItemRef> | null, };
+
 export const ENDPOINTS = {
   Status: { method: "GET", path: "/status", params: [], format: "json" },
   Shutdown: { method: "POST", path: "/shutdown", params: [], format: "json" },
@@ -5591,9 +5758,7 @@ export const ENDPOINTS = {
   GetConfig: { method: "GET", path: "/config", params: [], format: "json" },
   PatchConfig: { method: "PATCH", path: "/config", params: [], format: "json" },
   PutConfig: { method: "PUT", path: "/config", params: [], format: "json" },
-  ConfigHistory: { method: "GET", path: "/config/history", params: [], format: "json" },
   ConfigAt: { method: "GET", path: "/config/at", params: [], format: "json" },
-  ConfigRollback: { method: "POST", path: "/config/rollback", params: [], format: "json" },
   ConfigRepairPlan: { method: "GET", path: "/config/repair", params: [], format: "json" },
   RepairConfig: { method: "POST", path: "/config/repair", params: [], format: "json" },
   SaveListen: { method: "PUT", path: "/listen", params: [], format: "json" },
@@ -5702,6 +5867,15 @@ export const ENDPOINTS = {
   StartZaiLogin: { method: "POST", path: "/zai/login", params: [], format: "json" },
   ZaiLoginStatus: { method: "GET", path: "/zai/login/{id}", params: ["id"], format: "json" },
   CancelZaiLogin: { method: "DELETE", path: "/zai/login/{id}", params: ["id"], format: "json" },
+  // TEMP until core v0.77: 导入导出与备份（ConfigHistory / ConfigRollback 已由它们取代、删掉）
+  ConfigItems: { method: "GET", path: "/config/items", params: [], format: "json" },
+  ExportConfig: { method: "POST", path: "/config/export", params: [], format: "json" },
+  ImportPreview: { method: "POST", path: "/config/import/preview", params: [], format: "json" },
+  ImportConfig: { method: "POST", path: "/config/import", params: [], format: "json" },
+  Backups: { method: "GET", path: "/backups", params: [], format: "json" },
+  BackupFile: { method: "POST", path: "/backups/file", params: [], format: "json" },
+  RestorePreview: { method: "POST", path: "/backups/preview", params: [], format: "json" },
+  Restore: { method: "POST", path: "/backups/restore", params: [], format: "json" },
 } as const;
 
 // Request and response types per endpoint. `req` travels as the query string for GET
@@ -5721,9 +5895,7 @@ export type Endpoints = {
   GetConfig: { req: null; res: ConfigText };
   PatchConfig: { req: ConfigPatch; res: ConfigWritten };
   PutConfig: { req: ConfigWrite; res: ConfigWritten };
-  ConfigHistory: { req: null; res: Array<ConfigVersion> };
   ConfigAt: { req: ConfigAtQuery; res: ConfigAt };
-  ConfigRollback: { req: RollbackRequest; res: ConfigWritten };
   ConfigRepairPlan: { req: null; res: ConfigRepair };
   RepairConfig: { req: ConfigRepairRequest; res: ConfigWritten };
   SaveListen: { req: ListenSave; res: ConfigWritten };
@@ -5832,6 +6004,15 @@ export type Endpoints = {
   StartZaiLogin: { req: ZaiLoginStart; res: ZaiLogin };
   ZaiLoginStatus: { req: null; res: ZaiLoginStatus };
   CancelZaiLogin: { req: null; res: ZaiLoginStatus };
+  // TEMP until core v0.77
+  ConfigItems: { req: null; res: Array<ItemNode> };
+  ExportConfig: { req: ExportRequest; res: ExportedFile };
+  ImportPreview: { req: ImportSource; res: ImportPreview };
+  ImportConfig: { req: ImportRequest; res: ConfigWritten };
+  Backups: { req: null; res: Array<BackupEntry> };
+  BackupFile: { req: BackupFileRequest; res: ExportedFile };
+  RestorePreview: { req: BackupId; res: RestorePreview };
+  Restore: { req: RestoreRequest; res: ConfigWritten };
 };
 
 export type EndpointName = keyof Endpoints;

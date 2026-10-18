@@ -83,12 +83,31 @@ export const CORE: { [N in WebviewEndpoint]: Handler<N> } = {
   GetConfig: () => ({ path: "~/.thinkwatch/config.yaml", text: CONFIG_TEXT, version: configVersion() }),
   PatchConfig: refuse,
   PutConfig: refuse,
-  ConfigHistory: () => [{ version: configVersion(), at_ms: NOW - 2 * DAY, origin: "ui", bytes: 2_714, current: true }],
   ConfigAt: () => ({ section: null, name: null }),
-  ConfigRollback: refuse,
   ConfigRepairPlan: () => ({ base_version: configVersion(), fixes: [] }),
   RepairConfig: refuse,
   SaveListen: refuse,
+  // 导入导出与备份：只读的列一份当前版本，写的拒绝
+  ConfigItems: () => overview(lastSeen()).providers.map((p) => ({ item: { kind: "provider", name: p.name }, refs: [] })),
+  ExportConfig: refuse,
+  ImportPreview: refuse,
+  ImportConfig: refuse,
+  Backups: () => [
+    {
+      id: "0000000001-00000000",
+      at_ms: NOW - 2 * DAY,
+      origin: "ui",
+      device: null,
+      local: true,
+      sync: false,
+      counts: { providers: overview(lastSeen()).providers.length, plugins: 0 },
+      core_version: "0.77.0",
+      current: true,
+    },
+  ],
+  BackupFile: refuse,
+  RestorePreview: refuse,
+  Restore: refuse,
 
   History: (req) => {
     const from = req.from_ms ?? -Infinity;

@@ -4836,6 +4836,7 @@ name = "thinkwatch-lite"
 version = "2026.10.24"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "block2",
  "chrono",
  "dispatch2",

@@ -70,6 +70,8 @@ tw-guard = { workspace = true }
 tw-link = { workspace = true }
 
 anyhow = "1"
+# 配置包（`.twconfig`）在网页和这一侧之间按 Base64 交接（`export`）。锁里本来就有的那一版
+base64 = "0.22"
 # 新连接的 id、诊断包的临时目录名
 rand = "0.10"
 libc = "0.2"

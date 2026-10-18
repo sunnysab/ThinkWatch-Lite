@@ -23,6 +23,9 @@ import type { ENDPOINTS, Endpoints } from "./generated/tw-api";
  * `ApprovePluginFileConfirmed`）**有意不在这里**：只能请 Rust 弹系统的确认框
  * （`src/plugins/write.ts`）。不必点头的装、存、批准（`CreatePlugin`、`SavePlugin`、
  * `ApprovePluginFile`）在这里，core 说要点头时答 403。
+ *
+ * 末尾导入导出与备份的八个（`ConfigItems` … `Restore`）是 TEMP until core v0.77：类型在
+ * `tw-api.ts` 里手写，Rust 那边见 `call.rs` 的 `pending`。
  */
 export const WEBVIEW_ENDPOINTS = [
   "Interfaces",
@@ -33,9 +36,7 @@ export const WEBVIEW_ENDPOINTS = [
   "GetConfig",
   "PatchConfig",
   "PutConfig",
-  "ConfigHistory",
   "ConfigAt",
-  "ConfigRollback",
   "ConfigRepairPlan",
   "RepairConfig",
   "SaveListen",
@@ -122,6 +123,14 @@ export const WEBVIEW_ENDPOINTS = [
   "ReorderPlugins",
   "TrialPlugin",
   "PluginLogs",
+  "ConfigItems",
+  "ExportConfig",
+  "ImportPreview",
+  "ImportConfig",
+  "Backups",
+  "BackupFile",
+  "RestorePreview",
+  "Restore",
 ] as const;
 
 export type WebviewEndpoint = (typeof WEBVIEW_ENDPOINTS)[number];

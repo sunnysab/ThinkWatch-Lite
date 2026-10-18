@@ -219,6 +219,7 @@ pub fn run() {
             live::live_subscribe,
             live::live_unsubscribe,
             export::save_export,
+            export::open_import,
             upstreams::upstream_stats,
             aliases::alias_hints,
             notices::commands::notices_list,
@@ -232,6 +233,7 @@ pub fn run() {
             notices::commands::take_pending_view,
             import_link::take_import_link,
             import_link::import_link_closed,
+            import_link::share_import_link,
             keys::copy_key,
             keys::copy_gateway_base,
             keys::gateway_base,
@@ -591,6 +593,12 @@ pub fn run() {
             // 常驻 128 MB 不划算。销毁的代价是重开时要重新加载一次页面
             // （几百毫秒），`show_main_window` 本来就会在窗口不存在时
             // 重建它。
+            // 配置包拖进主窗口：放下时打开导入对话框（读文件在 `export` 这一侧）
+            if let tauri::WindowEvent::DragDrop(drop) = event
+                && window.label() == "main"
+            {
+                export::dropped(window, drop);
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let app = window.app_handle().clone();
