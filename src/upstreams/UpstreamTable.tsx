@@ -44,6 +44,7 @@ import { balanceFace, balanceTip, billingLine, sourceLabel, type BalanceFace } f
 import { balanceText } from "./balance.i18n";
 import { overviewText } from "@/overview/overview.i18n";
 import { rankCost } from "@/overview/series";
+import { SyncBadges } from "@/sync/UpstreamBadges";
 
 export interface UpstreamActions {
   edit: (name: string) => void;
@@ -385,6 +386,8 @@ function NameCell({
                 {plan}
               </Badge>
             )}
+            {/* 同步：不同步的上游、地址经同步变更（提示一次） */}
+            <SyncBadges p={p} />
             {problem && (
               <Tip
                 text={

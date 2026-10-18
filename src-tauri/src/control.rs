@@ -318,10 +318,19 @@ impl ControlClient {
     ///
     /// 断开就返回 —— **重连由调用方决定**。守护那边已经有退避逻辑了，
     /// 这里再来一套会变成两套互相不知道对方存在的重试。
-    pub async fn subscribe_events<O, F>(&self, on_open: O, mut on_event: F) -> Result<()>
+    ///
+    /// `on_extra`：钉着的 tw-api 认不出、而 core 已经在发的那几种（TEMP until core v0.77，
+    /// 见 `sync::Extra`）
+    pub async fn subscribe_events<O, F, G>(
+        &self,
+        on_open: O,
+        mut on_event: F,
+        mut on_extra: G,
+    ) -> Result<()>
     where
         O: FnOnce() + Send,
         F: FnMut(tw_api::Event) + Send,
+        G: FnMut(crate::sync::Extra) + Send,
     {
         let stream = self.connect().await?;
         let io = TokioIo::new(stream);
@@ -351,6 +360,8 @@ impl ControlClient {
             for m in frames.push(&chunk) {
                 if let Ok(ev) = serde_json::from_str::<tw_api::Event>(&m.data) {
                     on_event(ev);
+                } else if let Some(x) = crate::sync::Extra::parse(&m.data) {
+                    on_extra(x);
                 }
             }
         }

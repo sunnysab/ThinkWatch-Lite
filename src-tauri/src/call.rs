@@ -25,6 +25,13 @@
 use serde_json::Value;
 use tw_api::Endpoint;
 
+/// 白名单按名字在这里找端点：钉着的 tw-api 里的，加上 core 还没发版的同步那几个
+/// （TEMP until core v0.77：发版之后删掉第一行，`ep` 换回 `tw_api::ep`）
+mod ep {
+    pub use crate::sync::ep::*;
+    pub use tw_api::ep::*;
+}
+
 use crate::AppState;
 use crate::control::ControlClient;
 use crate::error::{CmdError, Out};
@@ -230,6 +237,18 @@ webview_endpoints![
     BackupFile,
     RestorePreview,
     Restore,
+    // 同步（TEMP until core v0.77）。固定密钥、通用偏好只经过 Rust（`sync`、`client_prefs`）
+    SyncStatus,
+    SyncTest,
+    SyncJoinPreview,
+    SyncEnable,
+    SyncSave,
+    SyncNow,
+    SyncConflicts,
+    SyncResolve,
+    SyncEncryption,
+    SyncUnlock,
+    SyncDisable,
 ];
 
 /// 请求按这个端点的类型读一遍再发：**界面发来的形状不对，在这里就停下**，
@@ -271,6 +290,11 @@ mod tests {
             "CreatePluginConfirmed",
             "SavePluginConfirmed",
             "ApprovePluginFileConfirmed",
+            // 哪几把密钥被接管着的客户端用着，由 Rust 这边算（它看得见这台机器上的客户端）；
+            // 通用偏好由 Rust 这边读写（`client_prefs`）
+            "PinKeys",
+            "GetClientPrefs",
+            "PutClientPrefs",
         ] {
             assert!(!ALLOWED.contains(&name), "{name}");
         }

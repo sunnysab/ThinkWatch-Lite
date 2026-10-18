@@ -70,7 +70,11 @@ export interface NavParams {
   security: { focus?: LogFocus };
   mcp: undefined;
   plugins: { plugin?: string; add?: boolean; review?: string };
-  settings: { section?: string; action?: "join-sync" };
+  settings: {
+    section?: string;
+    /** 打开那一节里的对话框：`join-sync` 是开启同步的向导（上游页空状态的「加入同步…」） */
+    action?: "join-sync";
+  };
 }
 
 export interface Nav {

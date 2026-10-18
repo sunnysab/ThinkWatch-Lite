@@ -48,6 +48,7 @@ import { upstreamsPageText } from "./UpstreamsPage.i18n";
 import { CostFigure } from "@/CostFigure";
 import { UpstreamTable, problemsOf } from "./UpstreamTable";
 import { NextClientsHint } from "@/guide/PageHints";
+import { SyncConflictBanner } from "@/sync/Notices";
 import { releaseImportLink } from "@/import/link";
 import { AliasesTab, AliasTabLabel, type AliasDialogMode } from "@/aliases/AliasesTab";
 import { AliasDialog } from "@/aliases/AliasDialog";
@@ -455,6 +456,8 @@ export default function UpstreamsPage({
           >
             {stats.error !== undefined ? errorText(stats.error) : null}
           </Banner>
+          {/* 同步有冲突：和设置里同一条提示，可以忽略 */}
+          <SyncConflictBanner />
           <NextClientsHint upstreams={providers.length} />
           {providers.length === 0 ? (
             <EmptyState

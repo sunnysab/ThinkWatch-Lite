@@ -19,6 +19,8 @@ pub mod autostart;
 pub mod call;
 pub mod chatgpt;
 pub mod cleanup;
+/// Lite 的通用偏好交给 core 保存、随同步走（方案 4.4），见模块头上
+pub mod client_prefs;
 pub mod clients;
 /// 系统睡醒、改时钟、换时区时叫醒定在钟点上的几处，见模块头上
 pub mod clock;
@@ -62,6 +64,8 @@ pub mod scan;
 pub mod settings;
 pub mod single;
 pub mod supervisor;
+/// 同步在这一侧的几件事：通知、改写接管着的客户端的密钥、固定密钥，见模块头上
+pub mod sync;
 pub mod theme;
 pub mod uninstall;
 pub mod update;
@@ -291,6 +295,11 @@ pub fn run() {
             plugins::plugin_approve_confirmed,
             scan::scan_clients,
             diagnostics::save_diagnostics,
+            sync::pick_sync_folder,
+            sync::sync_device_name,
+            sync::sync_pin_keys,
+            client_prefs::client_prefs,
+            client_prefs::apply_client_prefs,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

@@ -26,6 +26,8 @@ import type { ENDPOINTS, Endpoints } from "./generated/tw-api";
  *
  * 末尾导入导出与备份的八个（`ConfigItems` … `Restore`）是 TEMP until core v0.77：类型在
  * `tw-api.ts` 里手写，Rust 那边见 `call.rs` 的 `pending`。
+ * 同步的那几个（`Sync…`，TEMP until core v0.77）在这里；固定密钥（`PinKeys`）和通用偏好
+ * （`GetClientPrefs` / `PutClientPrefs`）只经过 Rust（`src-tauri/src/sync.rs`、`client_prefs.rs`）。
  */
 export const WEBVIEW_ENDPOINTS = [
   "Interfaces",
@@ -131,6 +133,17 @@ export const WEBVIEW_ENDPOINTS = [
   "BackupFile",
   "RestorePreview",
   "Restore",
+  "SyncStatus",
+  "SyncTest",
+  "SyncJoinPreview",
+  "SyncEnable",
+  "SyncSave",
+  "SyncNow",
+  "SyncConflicts",
+  "SyncResolve",
+  "SyncEncryption",
+  "SyncUnlock",
+  "SyncDisable",
 ] as const;
 
 export type WebviewEndpoint = (typeof WEBVIEW_ENDPOINTS)[number];

@@ -395,6 +395,7 @@ pub(crate) async fn bridge_events(app: tauri::AppHandle) {
         }
         let opened = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (a, b, o) = (app.clone(), app.clone(), opened.clone());
+        let x = app.clone();
         let resumed = connected_before;
         let sub = client.subscribe_events(
             move || {
@@ -402,6 +403,8 @@ pub(crate) async fn bridge_events(app: tauri::AppHandle) {
                 // **每次接上都按现状对一次账**：接上之前 core 报过的（启动时的凭据
                 // 失效、断线那段里被拒的配置），事件流不会再说一遍
                 reconcile_notices(&b);
+                // 同步那几样也是：固定密钥报一次、通用偏好读回来、同步的状态对一次
+                crate::sync::on_link(&b);
                 if resumed {
                     let lost = tw_api::Event::EventsDropped {
                         id: 0,
@@ -467,6 +470,11 @@ pub(crate) async fn bridge_events(app: tauri::AppHandle) {
                     });
                 }
                 let _ = a.emit("core-event", &ev);
+            },
+            // 同步的三种事件（TEMP until core v0.77）：这边要做的做完，原样交给界面
+            move |extra| {
+                crate::sync::on_extra(&x, &extra);
+                let _ = x.emit("core-event", &extra.raw);
             },
         );
         let switched = match until_switched(sub, &mut moved).await {

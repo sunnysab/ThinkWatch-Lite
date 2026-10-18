@@ -1726,7 +1726,7 @@ plugin_name: string,
 /**
  * 在哪个请求上出的错。停用（文件变了、加载不了）不挂在请求上，没有
  */
-request_id?: number | null, message: Msg, at_ms: number, } | { "kind": "events_dropped", id: number, count: number, at_ms: number, };
+request_id?: number | null, message: Msg, at_ms: number, } | { "kind": "events_dropped", id: number, count: number, at_ms: number, } | { "kind": "sync_status", id: number, view: SyncView, at_ms: number, } /* TEMP until core v0.77 */ | { "kind": "gateway_keys_changed", id: number, names: Array<string>, at_ms: number, } /* TEMP until core v0.77 */ | { "kind": "client_prefs_changed", id: number, at_ms: number, } /* TEMP until core v0.77 */;
 
 /**
  * 上游失败之后停用多久、多久没有内容就不再等。和配置的 `failover` 一一对应，
@@ -3757,7 +3757,12 @@ balance: Balance | null,
  * 密钥是用哪一家的账号登录换来的（配置里的 `signed_in:`）：`zai` / `bigmodel`。手填的
  * 密钥、别的上游、这一项出现之前登录的都是空。在界面里手动换掉密钥之后也是空
  */
-signed_in: ZaiFamily | null, };
+signed_in: ZaiFamily | null, 
+/**
+ * TEMP until core v0.77：未加密同步时，这个上游的地址经同步变了（原来的地址、哪台设备、何时）。
+ * 没有变过、或者已经看过是空
+ */
+sync_url_changed?: SyncUrlChange | null, };
 
 /**
  * 代理的用户名和密码。
@@ -5660,6 +5665,21 @@ export type ImportFlag = "missing_key" | "needs_login" | "plugin_disabled";
 
 // TEMP until core v0.77
 export type ImportRow = { item: ItemRef, status: ImportStatus, 
+// ─────────────────────────────────────────────── TEMP until core v0.77
+// 同步（core `feat/sync`）和它用到的配置包、客户端偏好、固定密钥（core `feat/pack-backup`）。
+// **手写的**：core 发版后由生成的那一份替换，形状以 core 为准。
+
+export type JsonValue = number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null;
+
+export type ItemKind = "provider" | "proxy" | "key" | "alias" | "group" | "route" | "price_sheet" | "security_rule" | "plugin" | "route_order" | "global" | "client_prefs";
+
+export type ItemRef = { kind: ItemKind, name: string, };
+
+export type ImportRowStatus = "new" | "same" | "conflict" | "error";
+
+export type ImportFlag = "missing_key" | "needs_login" | "plugin_disabled";
+
+export type ImportRow = { item: ItemRef, status: ImportRowStatus, 
 /**
  * 全局设置的一节：冲突时只能覆盖或跳过
  */
@@ -5742,6 +5762,103 @@ export type RestoreRequest = { id: string, base_version: string,
  * 只恢复这几项。null = 全部
  */
 items: Array<ItemRef> | null, };
+ * 不同的合并单位（`conn` / `models` / `billing` / `other`，插件是 `script` / `settings` / `enabled`）
+ */
+differs: Array<string>, suggested_name: string | null, error: Msg | null, };
+
+export type ImportAction = "import" | "overwrite" | "rename" | "skip";
+
+export type ImportDecision = { item: ItemRef, action: ImportAction, new_name?: string | null, };
+
+/**
+ * Lite 的通用偏好，core 不解析，原样存取。还没存过是空
+ */
+export type ClientPrefs = { prefs: JsonValue | null, };
+
+export type PinnedKeys = { names: Array<string>, };
+
+export type SyncTarget = ({ "type": "folder", path: string, } | { "type": "webdav", url: string, user: string, pass: string, } | { "type": "s3", endpoint: string, region: string, bucket: string, prefix: string, access_key_id: string, secret_access_key: string, }) & { 
+/**
+ * `direct` 或出站代理的名字
+ */
+proxy: string, };
+
+export type SyncState = "off" | "idle" | "syncing" | "conflict" | "unreachable" | "auth_failed" | "locked" | "too_new" | "paused";
+
+export type SyncDevice = { id: string, name: string, core_version: string, last_seen_ms: number, this: boolean, 
+/**
+ * 同步位置上有它解析不了的版本，暂停了（需要更新）
+ */
+paused_update: boolean, };
+
+export type SyncView = { state: SyncState, target: SyncTarget | null, encrypted: boolean, device: { id: string, name: string, } | null, last_synced_ms: number | null, 
+/**
+ * 从什么时候起连不上。连续 2 小时才变成 `unreachable`
+ */
+failing_since_ms: number | null, error: Msg | null, devices: Array<SyncDevice>, conflicts: number, 
+/**
+ * 不同步的上游
+ */
+excluded: Array<string>, 
+/**
+ * 引用了不同步的上游、随之不同步的项
+ */
+excluded_cascade: Array<ItemRef>, };
+
+export type SyncTest = { target: SyncTarget, passphrase: string | null, };
+
+export type SyncProbeExisting = { encrypted: boolean, 
+/**
+ * 给的口令解得开（未加密时恒为 true）。没给口令时设备列表是空的
+ */
+unlocked: boolean, devices: Array<SyncDevice>, };
+
+export type SyncProbe = { writable: boolean, error: Msg | null, 
+/**
+ * 同步位置上已经有同步数据。空的是 null
+ */
+existing: SyncProbeExisting | null, };
+
+export type SyncJoinPreview = { 
+/**
+ * 本机配置还是初始配置：不用合并，直接用同步数据
+ */
+initial: boolean, rows: Array<ImportRow>, };
+
+export type SyncJoin = "merge" | "use_remote";
+
+export type SyncEnable = { target: SyncTarget, encrypt: boolean, passphrase: string | null, device_name: string, join: SyncJoin, decisions: Array<ImportDecision>, };
+
+export type SyncSettingsSave = { target?: SyncTarget | null, device_name?: string | null, excluded?: Array<string> | null, };
+
+export type SyncConflictSide = { device: string, at_ms: number, 
+/**
+ * TEMP：这一边删掉了它（冲突对话框据此写「删除」）
+ */
+deleted?: boolean, };
+
+export type SyncConflict = { id: string, item: ItemRef, units: Array<string>, local: SyncConflictSide, remote: SyncConflictSide, both_allowed: boolean, reason: "key_in_use" | "invalid" | null, };
+
+export type SyncTake = "local" | "remote" | "both";
+
+export type SyncResolveDecision = { id: string, take: SyncTake, new_name?: string | null, };
+
+export type SyncResolve = { decisions: Array<SyncResolveDecision>, };
+
+export type SyncEncryptionAction = "enable" | "disable" | "change";
+
+export type SyncEncryption = { action: SyncEncryptionAction, passphrase: string | null, new_passphrase: string | null, };
+
+export type SyncUnlock = { passphrase: string, };
+
+export type SyncDisable = { purge: boolean, };
+
+/**
+ * 上游地址经同步变了：原来的地址、哪台设备改的、何时
+ */
+export type SyncUrlChange = { from: string, device: string | null, at_ms: number, };
+
+// ─────────────────────────────────────────────── TEMP end
 
 export const ENDPOINTS = {
   Status: { method: "GET", path: "/status", params: [], format: "json" },
@@ -5876,6 +5993,21 @@ export const ENDPOINTS = {
   BackupFile: { method: "POST", path: "/backups/file", params: [], format: "json" },
   RestorePreview: { method: "POST", path: "/backups/preview", params: [], format: "json" },
   Restore: { method: "POST", path: "/backups/restore", params: [], format: "json" },
+  // TEMP until core v0.77
+  GetClientPrefs: { method: "GET", path: "/client-prefs", params: [], format: "json" },
+  PutClientPrefs: { method: "PUT", path: "/client-prefs", params: [], format: "json" },
+  PinKeys: { method: "PUT", path: "/pinned-keys", params: [], format: "json" },
+  SyncStatus: { method: "GET", path: "/sync", params: [], format: "json" },
+  SyncTest: { method: "POST", path: "/sync/test", params: [], format: "json" },
+  SyncJoinPreview: { method: "POST", path: "/sync/enable/preview", params: [], format: "json" },
+  SyncEnable: { method: "POST", path: "/sync/enable", params: [], format: "json" },
+  SyncSave: { method: "PUT", path: "/sync/settings", params: [], format: "json" },
+  SyncNow: { method: "POST", path: "/sync/now", params: [], format: "json" },
+  SyncConflicts: { method: "GET", path: "/sync/conflicts", params: [], format: "json" },
+  SyncResolve: { method: "POST", path: "/sync/conflicts", params: [], format: "json" },
+  SyncEncryption: { method: "POST", path: "/sync/encryption", params: [], format: "json" },
+  SyncUnlock: { method: "POST", path: "/sync/unlock", params: [], format: "json" },
+  SyncDisable: { method: "POST", path: "/sync/disable", params: [], format: "json" },
 } as const;
 
 // Request and response types per endpoint. `req` travels as the query string for GET
@@ -6013,6 +6145,20 @@ export type Endpoints = {
   BackupFile: { req: BackupFileRequest; res: ExportedFile };
   RestorePreview: { req: BackupId; res: RestorePreview };
   Restore: { req: RestoreRequest; res: ConfigWritten };
+  GetClientPrefs: { req: null; res: ClientPrefs };
+  PutClientPrefs: { req: ClientPrefs; res: null };
+  PinKeys: { req: PinnedKeys; res: null };
+  SyncStatus: { req: null; res: SyncView };
+  SyncTest: { req: SyncTest; res: SyncProbe };
+  SyncJoinPreview: { req: SyncTest; res: SyncJoinPreview };
+  SyncEnable: { req: SyncEnable; res: ConfigWritten };
+  SyncSave: { req: SyncSettingsSave; res: ConfigWritten };
+  SyncNow: { req: null; res: SyncView };
+  SyncConflicts: { req: null; res: Array<SyncConflict> };
+  SyncResolve: { req: SyncResolve; res: SyncView };
+  SyncEncryption: { req: SyncEncryption; res: SyncView };
+  SyncUnlock: { req: SyncUnlock; res: SyncView };
+  SyncDisable: { req: SyncDisable; res: null };
 };
 
 export type EndpointName = keyof Endpoints;

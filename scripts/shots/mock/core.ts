@@ -247,6 +247,30 @@ export const CORE: { [N in WebviewEndpoint]: Handler<N> } = {
   ReorderPlugins: refuse,
   TrialPlugin: refuse,
   PluginLogs: () => [],
+  // 同步（协议 50）：截图里没开同步，改的一律拒绝
+  SyncStatus: () => ({
+    state: "off",
+    target: null,
+    encrypted: true,
+    device: null,
+    last_synced_ms: null,
+    failing_since_ms: null,
+    error: null,
+    devices: [],
+    conflicts: 0,
+    excluded: [],
+    excluded_cascade: [],
+  }),
+  SyncTest: refuse,
+  SyncJoinPreview: refuse,
+  SyncEnable: refuse,
+  SyncSave: refuse,
+  SyncNow: refuse,
+  SyncConflicts: () => [],
+  SyncResolve: refuse,
+  SyncEncryption: refuse,
+  SyncUnlock: refuse,
+  SyncDisable: refuse,
 };
 
 /** ChatGPT Plus 的两个额度窗口：5 小时用了一半多，每周的三成 */

@@ -41,6 +41,7 @@ import { settingsText } from "./SettingsPage.i18n";
 import { SYNC_BACKUP, SyncBackupSection } from "./SyncBackupSection";
 import { syncBackupText } from "./SyncBackupSection.i18n";
 import { UninstallSection } from "./UninstallSection";
+// TEMP：「同步与备份」一节的外壳（settings/SyncBackupSection.tsx）合进来之前，先挂同步那一半
 
 /**
  * 设置。

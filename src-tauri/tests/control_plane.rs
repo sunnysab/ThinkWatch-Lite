@@ -197,6 +197,7 @@ async fn the_event_stream_goes_through_the_handshake_too() {
         c.subscribe_events(
             move || o.store(true, std::sync::atomic::Ordering::SeqCst),
             |_| {},
+            |_| {},
         ),
     )
     .await;
