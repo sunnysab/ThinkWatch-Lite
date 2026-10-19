@@ -24,17 +24,20 @@ export function stateMark(v: SyncView): string {
 
 /**
  * 同步要人处理的几件事，黄色提示（方案 6.10），**都可以忽略**。`only="conflicts"`：上游页
- * 顶上只说冲突，别的几件在设置里说。
+ * 顶上只说冲突，别的几件在设置里说。`withoutConflicts`：设置里的状态行已经写着冲突数、
+ * 带着「处理冲突…」，那里不再重复一条冲突提示。
  *
  * 正常运转（已同步、同步中）什么都不说。安全模式下暂停是灰色的告知，不用处理，也不给忽略。
  */
 export function SyncNotices({
   view,
   only,
+  withoutConflicts = false,
   onChanged,
 }: {
   view: SyncView;
   only?: "conflicts";
+  withoutConflicts?: boolean;
   /** 处理了冲突、输了口令：外面换上新的状态 */
   onChanged: (v: SyncView) => void;
 }) {
@@ -58,7 +61,7 @@ export function SyncNotices({
       <Banner
         layout="inline"
         tone="warning"
-        show={view.conflicts > 0 && !conflicts.ignored}
+        show={!withoutConflicts && view.conflicts > 0 && !conflicts.ignored}
         title={t.conflictTitle(view.conflicts)}
         onIgnore={conflicts.ignore}
         actions={

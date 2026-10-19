@@ -209,7 +209,7 @@ function On({
           </>
         }
       />
-      <SyncNotices view={view} onChanged={onView} />
+      <SyncNotices view={view} withoutConflicts onChanged={onView} />
       <form
         onSubmit={(e) => {
           e.preventDefault();
