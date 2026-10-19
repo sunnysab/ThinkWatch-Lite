@@ -27,6 +27,12 @@ export const backupApi = {
   restorePreview: (id: string) => call("RestorePreview", { id }),
   restore: (id: string, baseVersion: string, items: ItemRef[] | null) =>
     call("Restore", { id, base_version: baseVersion, items }),
+  /**
+   * 远程模式下 Lite 自己的通用偏好（导出时附上，规格 4.4）。本机模式下 core 存着它，不用附
+   */
+  clientPrefs: () => invoke<unknown>("client_prefs"),
+  /** 远程模式下导入的配置包带着通用偏好：应用到这台设备上 */
+  applyClientPrefs: (prefs: unknown) => invoke<boolean>("apply_client_prefs", { prefs }),
   /** 弹「打开」对话框，读所选的配置包。取消了是 `null` */
   open: () => invoke<PickedFile | null>("open_import"),
   /** 弹「存储」对话框，把配置包写到所选的位置。交回写到的路径；取消了是 `null` */

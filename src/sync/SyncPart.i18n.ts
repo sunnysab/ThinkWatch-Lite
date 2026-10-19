@@ -35,6 +35,8 @@ export const syncPartText = messages(
     coreVersion: "Core 版本",
     deviceState: "状态",
     thisDevice: (name: string) => `${name}（本设备）`,
+    /** 服务器上的 core 加入的同步 */
+    remoteCore: (name: string) => `${name}（远程 core）`,
     ok: "正常",
     pausedUpdate: "已暂停：需更新",
     saveFailed: "未能保存",
@@ -75,6 +77,7 @@ export const syncPartText = messages(
     coreVersion: "Core version",
     deviceState: "Status",
     thisDevice: (name: string) => `${name} (this device)`,
+    remoteCore: (name: string) => `${name} (remote core)`,
     ok: "OK",
     pausedUpdate: "Paused: update required",
     saveFailed: "Could not save",

@@ -17,20 +17,11 @@ export function useSyncView(): Resource<SyncView> {
     () =>
       subscribe<CoreEvent>("core-event", (e) => {
         const ev = e.payload;
-        if (ev.kind === "sync_status") mutate(viewOf(ev));
+        if (ev.kind === "sync_status") mutate(ev.view);
       }),
     [mutate],
   );
   return r;
-}
-
-/**
- * 事件里的那一份。事件写成 `SyncStatus(SyncView)`：TEMP until core v0.77，字段放在
- * `view` 里、平铺在事件上两种都认
- */
-export function viewOf(ev: Extract<CoreEvent, { kind: "sync_status" }>): SyncView {
-  const nested = (ev as { view?: SyncView }).view;
-  return nested ?? (ev as unknown as SyncView);
 }
 
 /** 开着同步吗（`off` 以外都算开着：连不上、冲突、暂停都还是开着的） */

@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { ChevronRightIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Banner } from "@/ui/banner";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
@@ -11,7 +13,7 @@ import { useResource } from "@/lib/resource";
 import { whenMinute } from "@/format";
 import { useText } from "@/i18n";
 import { errorText } from "@/i18n/core.i18n";
-import type { SyncConflict, SyncConflictSide, SyncTake, SyncView } from "@/types";
+import type { SyncConflict, SyncConflictDiff, SyncConflictSide, SyncTake, SyncView } from "@/types";
 import { SYNC_KEYS, syncApi } from "./api";
 import { conflictText } from "./ConflictDialog.i18n";
 import {
@@ -21,12 +23,14 @@ import {
   resolveDecisions,
   type ConflictPicks,
 } from "./decide";
-import { itemWithUnits } from "./labels";
+import { itemWithUnits, unitLabel } from "./labels";
 
 /**
  * 同步冲突（方案 6.7）：同一个合并单位在本机和另一台设备上被改成了不同的内容。每一项选
  * 「使用本机」「使用 <那台设备>」或「两者都保留」（另一方的内容以新名字加进来；全局设置、
  * 路由顺序、通用偏好没有这一项）。
+ *
+ * 点对象名称展开差异：每个合并单位两边各是什么（core 给的 `diff`，删掉的一边写「已删除」）。
  *
  * **只交选了的**：没选的留着，下次再处理（「稍后处理」）。处理的结果作为新版本上传，别的
  * 设备随之清掉同一条冲突，不用再处理一遍 —— 那是 core 的事，这里只交选择。
@@ -144,6 +148,7 @@ function Row({
   onPick: (p: Partial<{ take: SyncTake; name: string }>) => void;
 }) {
   const t = useText(conflictText);
+  const [open, setOpen] = useState(false);
   const problem = keepBothProblem(c, pick);
   const options: { id: SyncTake; label: string }[] = [
     { id: "local", label: t.here },
@@ -151,51 +156,111 @@ function Row({
     ...(c.both_allowed ? [{ id: "both" as const, label: t.both }] : []),
   ];
   return (
-    <TableRow className="hover:bg-transparent">
-      <TableCell className="max-w-0 align-top whitespace-normal">
-        <p className="break-words">{itemWithUnits(c.item, c.units)}</p>
-        {c.reason && (
-          <p className="mt-0.5 tw-label text-warning-foreground">{c.reason === "key_in_use" ? t.keyInUse : t.invalid}</p>
-        )}
-      </TableCell>
-      <TableCell className="align-top tw-num text-muted-foreground">
-        <Side side={c.local} />
-      </TableCell>
-      <TableCell className="align-top tw-num text-muted-foreground">
-        {showDevice && <p className="text-foreground">{c.remote.device}</p>}
-        <Side side={c.remote} />
-      </TableCell>
-      <TableCell className="align-top">
-        <div className="flex flex-col items-end gap-1">
-          <Segmented<SyncTake>
-            label={t.take}
-            value={pick?.take ?? ("" as SyncTake)}
-            disabled={disabled}
-            options={options}
-            onChange={(take) => onPick({ take })}
-          />
-          {pick?.take === "both" && (
-            <>
-              <Input
-                variant="sm"
-                className="w-56 motion-fade"
-                aria-label={t.bothName(c.item.name)}
-                title={t.bothNameHint}
-                aria-invalid={problem !== null || undefined}
-                value={pick.name}
-                disabled={disabled}
-                spellCheck={false}
-                autoComplete="off"
-                onChange={(e) => onPick({ name: e.target.value })}
+    <Fragment>
+      <TableRow className="hover:bg-transparent">
+        <TableCell className="max-w-0 align-top whitespace-normal">
+          {c.diff.length > 0 ? (
+            <button
+              type="button"
+              aria-expanded={open}
+              title={open ? t.hideDiff : t.showDiff}
+              className="-ml-1 flex items-start gap-0.5 rounded-sm px-1 text-left break-words hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring/50"
+              onClick={() => setOpen((o) => !o)}
+            >
+              <ChevronRightIcon
+                aria-hidden
+                className={cn("mt-[3px] size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
               />
-              {problem && (
-                <span className="tw-label text-destructive">{problem === "empty" ? t.bothEmpty : t.bothSame}</span>
-              )}
-            </>
+              <span>{itemWithUnits(c.item, c.units)}</span>
+            </button>
+          ) : (
+            <p className="break-words">{itemWithUnits(c.item, c.units)}</p>
           )}
+          {c.reason && (
+            <p className="mt-0.5 tw-label text-warning-foreground">{c.reason === "key_in_use" ? t.keyInUse : t.invalid}</p>
+          )}
+        </TableCell>
+        <TableCell className="align-top tw-num text-muted-foreground">
+          <Side side={c.local} />
+        </TableCell>
+        <TableCell className="align-top tw-num text-muted-foreground">
+          {showDevice && <p className="text-foreground">{c.remote.device}</p>}
+          <Side side={c.remote} />
+        </TableCell>
+        <TableCell className="align-top">
+          <div className="flex flex-col items-end gap-1">
+            <Segmented<SyncTake>
+              label={t.take}
+              value={pick?.take ?? ("" as SyncTake)}
+              disabled={disabled}
+              options={options}
+              onChange={(take) => onPick({ take })}
+            />
+            {pick?.take === "both" && (
+              <>
+                <Input
+                  variant="sm"
+                  className="w-56 motion-fade"
+                  aria-label={t.bothName(c.item.name)}
+                  title={t.bothNameHint}
+                  aria-invalid={problem !== null || undefined}
+                  value={pick.name}
+                  disabled={disabled}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => onPick({ name: e.target.value })}
+                />
+                {problem && (
+                  <span className="tw-label text-destructive">{problem === "empty" ? t.bothEmpty : t.bothSame}</span>
+                )}
+              </>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+      {open && (
+        <TableRow className="hover:bg-transparent">
+          <TableCell colSpan={4} className="bg-muted/30 whitespace-normal">
+            <Diff diff={c.diff} remote={c.remote.device} />
+          </TableCell>
+        </TableRow>
+      )}
+    </Fragment>
+  );
+}
+
+/** 一个冲突的差异：每个合并单位一行，本机和另一台设备的内容并排 */
+function Diff({ diff, remote }: { diff: SyncConflictDiff[]; remote: string }) {
+  const t = useText(conflictText);
+  return (
+    <div className="flex flex-col gap-2 py-1 motion-fade">
+      {diff.map((d) => (
+        <div key={d.unit} className="flex flex-col gap-1">
+          {d.unit !== "all" && <p className="tw-label font-medium text-muted-foreground">{unitLabel(d.unit)}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <Value label={t.here} value={d.local} />
+            <Value label={remote} value={d.remote} />
+          </div>
         </div>
-      </TableCell>
-    </TableRow>
+      ))}
+    </div>
+  );
+}
+
+/** 一边的内容：JSON 原样排好；这一边删掉了写「已删除」 */
+function Value({ label, value }: { label: string; value: unknown }) {
+  const t = useText(conflictText);
+  return (
+    <div className="min-w-0">
+      <p className="mb-0.5 tw-label text-muted-foreground">{label}</p>
+      {value === null || value === undefined ? (
+        <p className="tw-body text-muted-foreground italic">{t.deleted}</p>
+      ) : (
+        <pre className="max-h-48 overflow-auto rounded-md border border-border bg-popover px-2 py-1.5 font-mono tw-label whitespace-pre-wrap break-all select-text">
+          {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
+        </pre>
+      )}
+    </div>
   );
 }
 

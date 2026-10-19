@@ -26,12 +26,15 @@ license = "MIT"
 # twcore 二进制必须和这里编译进去的协议镜像来自同一个 core 版本 —— 打包脚本正是
 # 从 tw-api 锁到的 tag 去取二进制的（见 scripts/fetch-core.sh）。
 [workspace.dependencies]
-tw-api = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", tag = "v0.76.0" }
-tw-types = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", tag = "v0.76.0" }
-tw-yaml = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", tag = "v0.76.0" }
-tw-guard = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", tag = "v0.76.0" }
-tw-watch = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", tag = "v0.76.0" }
-tw-link = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", tag = "v0.76.0" }
+# TEMP：同步与备份（协议 50）还没发版，临时钉在 core 的 feat/sync-backup（908e1fd）。
+# **发版后换回 tag**（fetch-core.sh 只认 tag）。六个一起钉同一个 rev：tw-api 引用 tw-guard 的类型，
+# 握手的协议号来自 tw-api，混着钉会出两份同名 crate
+tw-api = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", rev = "908e1fd1dcfbec3d91ad9d0ba2df606fced6f660" }
+tw-types = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", rev = "908e1fd1dcfbec3d91ad9d0ba2df606fced6f660" }
+tw-yaml = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", rev = "908e1fd1dcfbec3d91ad9d0ba2df606fced6f660" }
+tw-guard = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", rev = "908e1fd1dcfbec3d91ad9d0ba2df606fced6f660" }
+tw-watch = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", rev = "908e1fd1dcfbec3d91ad9d0ba2df606fced6f660" }
+tw-link = { git = "https://github.com/ThinkWatchProject/ThinkWatch-Core.git", rev = "908e1fd1dcfbec3d91ad9d0ba2df606fced6f660" }
 
 [lib]
 name = "thinkwatch_lite_lib"

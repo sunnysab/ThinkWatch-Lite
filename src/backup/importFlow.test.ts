@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ImportRow, ItemKind } from "@/types";
 import {
   actionsFor,
+  blocked,
   bulk,
   carryOver,
   decisions,
@@ -22,6 +23,7 @@ function row(kind: ItemKind, name: string, status: ImportRow["status"], patch: P
     differs: [],
     suggested_name: status === "conflict" && kind !== "global" ? `${name} (2)` : null,
     error: null,
+    refs: [],
     ...patch,
   };
 }
@@ -95,6 +97,34 @@ describe("导入的逐项处理", () => {
     expect(c["global:failover"]?.action).toBe("overwrite");
     // 原来是新增（导入），现在成了冲突：导入不是冲突的处理，要重新选
     expect(c["provider:OpenRouter"]?.action).toBeNull();
+  });
+
+  /** 规格 5.4：引用了跳过的、不可导入的项目的，随之不可导入；改名导入的、本机已有同名的不算 */
+  it("引用了不导入的项目的随之不可导入，一层层传下去", () => {
+    const rows: ImportRow[] = [
+      row("provider", "relay", "new"),
+      row("provider", "bad", "error"),
+      row("provider", "anthropic", "conflict"),
+      row("group", "main", "new", { refs: [{ kind: "provider", name: "relay" }] }),
+      row("route", "long", "new", { refs: [{ kind: "group", name: "main" }] }),
+      row("route", "tokyo", "new", { refs: [{ kind: "provider", name: "bad" }] }),
+      row("route", "direct", "conflict", { refs: [{ kind: "provider", name: "anthropic" }] }),
+    ];
+    let c = initialChoices(rows);
+    expect(Object.keys(blocked(rows, c))).toEqual(["route:tokyo"]);
+    c = { ...c, "provider:relay": { action: "skip", name: "" } };
+    expect(blocked(rows, c)).toEqual({
+      "group:main": { kind: "provider", name: "relay" },
+      "route:long": { kind: "group", name: "main" },
+      "route:tokyo": { kind: "provider", name: "bad" },
+    });
+    // 跳过冲突的上游：本机有同名的，引用它的照样能导入
+    c = { ...c, "provider:anthropic": { action: "skip", name: "" }, "route:direct": { action: "overwrite", name: "" } };
+    expect(blocked(rows, c)["route:direct"]).toBeUndefined();
+    // 不可导入的交「跳过」，不算没选
+    const ds = decisions(rows, c);
+    expect(ds.find((d) => d.item.name === "long")?.action).toBe("skip");
+    expect(unresolved(rows, { ...c, "route:direct": { action: null, name: "" } })).toBe(1);
   });
 
   it("交给 core 的：新增与冲突各一条，改名的带新名字，取消勾选的是跳过", () => {

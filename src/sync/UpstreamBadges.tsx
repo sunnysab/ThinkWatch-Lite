@@ -3,14 +3,11 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Tip } from "@/ui/tip";
-import { useResource } from "@/lib/resource";
 import { useIgnored } from "@/ignore";
 import { whenMinute } from "@/format";
 import { useText } from "@/i18n";
 import type { ProviderView } from "@/types";
-import { SYNC_KEYS, syncApi } from "./api";
 import { upstreamBadgesText } from "./UpstreamBadges.i18n";
-import { syncOn } from "./useSync";
 
 /** 行里自己能点的：点击、按键不冒泡成「打开这一行」（弹层挂在行的 React 树里，也一样） */
 const keep = {
@@ -26,13 +23,12 @@ const keep = {
  *   从哪儿改到哪儿、哪台设备改的，「标为已读」之后不再出现（记在这台电脑上），再变一次才
  *   又出现。
  *
- * 同步状态和设置、上游页顶上的提示是同一份缓存（那两处挂着事件，这里只读）。
+ * 两样都是 core 写在上游上的（`sync_excluded`、`sync_url_changed`）。
  */
 export function SyncBadges({ p }: { p: ProviderView }) {
   const t = useText(upstreamBadgesText);
-  const sync = useResource(SYNC_KEYS.status, syncApi.status);
-  const v = sync.data;
-  const excluded = syncOn(v) && v.excluded.includes(p.name);
+  // core 在上游上写明（开着同步、在「不同步的上游」里）
+  const excluded = p.sync_excluded;
   const change = p.sync_url_changed ?? null;
   const read = useIgnored(`sync-url:${p.name}`, change ? `${change.at_ms}` : "", (a, b) => a === b);
   const showChange = !!change && !read.ignored;

@@ -17,12 +17,15 @@ import { commonText } from "@/i18n/common.i18n";
 import { coreText, errorText } from "@/i18n/core.i18n";
 import { whenMinute } from "@/format";
 import { DialogError } from "@/upstreams/parts";
-import type { ImportAction, ImportPreview, ImportRow, ItemKind, PickedFile } from "@/types";
+import type { ImportAction, ImportPreview, ImportRow, ItemKind, ItemRef, PickedFile } from "@/types";
+import { FixList } from "@/repair";
+import { useRemote } from "@/connection/useRemote";
 import { BACKUPS_KEY, backupApi } from "./api";
 import { backupText } from "./backup.i18n";
 import { useConfigItems } from "./ExportDialog";
 import {
   actionsFor,
+  blocked,
   bulk,
   carryOver,
   decisions,
@@ -78,6 +81,7 @@ export function ImportDialog({
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const items = useConfigItems();
+  const remote = useRemote() !== null;
 
   const preview = useCallback(
     async (pass: string | null) => {
@@ -118,6 +122,11 @@ export function ImportDialog({
     try {
       const ds = decisions(p.rows, choices);
       await backupApi.import(file, used.current, p.base_version, ds);
+      // 连着远程 core：通用偏好在这台设备上，配置包里带着的由这里应用（本机模式下 core 存着，
+      // 变了它自己说一声）
+      if (remote && p.client_prefs != null) {
+        await backupApi.applyClientPrefs(p.client_prefs).catch((e: unknown) => notify.error(e));
+      }
       notify.success(t.imported(writing(ds)));
       invalidate(BACKUPS_KEY);
       onImported?.();
@@ -133,6 +142,7 @@ export function ImportDialog({
   const ready = phase.kind === "ready" ? phase.preview : null;
   const rows = ready ? ready.rows : [];
   const problems = ready ? nameProblems(rows, choices, taken) : {};
+  const stuck = ready ? blocked(rows, choices) : {};
   const open = ready ? unresolved(rows, choices) : 0;
   const ds = ready ? decisions(rows, choices) : [];
   const count = writing(ds);
@@ -233,10 +243,16 @@ export function ImportDialog({
               }
             />
             <div className="-mx-4 min-h-0 flex-1 overflow-y-auto border-y border-border px-4">
+              {ready.repairs.length > 0 && (
+                <Banner layout="inline" tone="info" title={t.repaired(ready.repairs.length)} className="mt-3">
+                  <FixList fixes={ready.repairs} />
+                </Banner>
+              )}
               <RowsTable
                 rows={rows}
                 choices={choices}
                 problems={problems}
+                stuck={stuck}
                 disabled={busy}
                 onChange={(key, next) => setChoices((cs) => ({ ...cs, [key]: { ...cs[key]!, ...next } }))}
               />
@@ -292,12 +308,15 @@ function RowsTable({
   rows,
   choices,
   problems,
+  stuck,
   disabled,
   onChange,
 }: {
   rows: readonly ImportRow[];
   choices: Choices;
   problems: Record<string, "empty" | "taken">;
+  /** 因为引用了不导入的项目而导不进来的行 → 缺的那一项 */
+  stuck: Record<string, ItemRef>;
   disabled: boolean;
   onChange: (key: string, next: Partial<Choices[string]>) => void;
 }) {
@@ -329,11 +348,12 @@ function RowsTable({
                     {itemLabel(r.item)}
                   </TableCell>
                   <TableCell className="align-top whitespace-normal">
-                    <StatusCell r={r} />
+                    <StatusCell r={r} missing={stuck[key]} />
                   </TableCell>
                   <TableCell className="align-top">
                     <ActionCell
                       r={r}
+                      stuck={stuck[key] !== undefined}
                       choice={choices[key]}
                       problem={problems[key]}
                       disabled={disabled}
@@ -351,8 +371,16 @@ function RowsTable({
 }
 
 /** 状态那一格：新增 / 冲突 / 错误，加上导入后停用的几种标记；后面一句是哪里不同、为什么不行 */
-function StatusCell({ r }: { r: ImportRow }) {
+function StatusCell({ r, missing }: { r: ImportRow; missing?: ItemRef }) {
   const t = useText(backupText);
+  if (missing) {
+    return (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Badge variant="destructive">{t.statusError}</Badge>
+        <span className="tw-label text-muted-foreground">{t.refSkipped(kindLabel(missing.kind), itemLabel(missing))}</span>
+      </span>
+    );
+  }
   const hint =
     r.status === "error"
       ? r.error
@@ -380,19 +408,23 @@ function StatusCell({ r }: { r: ImportRow }) {
 /** 处理那一格：新增的一个勾选框，冲突的三选一（改名导入带一个名字），错误的写「不可导入」 */
 function ActionCell({
   r,
+  stuck,
   choice,
   problem,
   disabled,
   onChange,
 }: {
   r: ImportRow;
+  stuck: boolean;
   choice: Choices[string] | undefined;
   problem: "empty" | "taken" | undefined;
   disabled: boolean;
   onChange: (next: Partial<Choices[string]>) => void;
 }) {
   const t = useText(backupText);
-  if (r.status === "error") return <span className="tw-body whitespace-nowrap text-muted-foreground">{t.cannotImport}</span>;
+  if (r.status === "error" || stuck) {
+    return <span className="tw-body whitespace-nowrap text-muted-foreground">{t.cannotImport}</span>;
+  }
   if (r.status === "new") {
     return (
       <label className="flex items-center gap-2 tw-body whitespace-nowrap">

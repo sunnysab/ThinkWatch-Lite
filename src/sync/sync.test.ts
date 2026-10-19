@@ -17,7 +17,7 @@ import {
 import { ago, itemLabel, itemWithUnits } from "./labels";
 import { stateMark } from "./Notices";
 import { draftOf, EMPTY_TARGET, passphraseProblem, sameTarget, targetOf, targetProblem } from "./target";
-import { syncOn, viewOf } from "./useSync";
+import { syncOn } from "./useSync";
 
 const row = (kind: ImportRow["item"]["kind"], name: string, status: ImportRow["status"], extra: Partial<ImportRow> = {}): ImportRow => ({
   item: { kind, name },
@@ -27,6 +27,7 @@ const row = (kind: ImportRow["item"]["kind"], name: string, status: ImportRow["s
   differs: [],
   suggested_name: status === "conflict" ? `${name} (2)` : null,
   error: null,
+  refs: [],
   ...extra,
 });
 
@@ -126,8 +127,9 @@ describe("同步冲突", () => {
     id,
     item: { kind: "provider", name },
     units: ["conn"],
-    local: { device: "Mac mini", at_ms: 1 },
-    remote: { device, at_ms: 2 },
+    local: { device: "Mac mini", at_ms: 1, deleted: false },
+    remote: { device, at_ms: 2, deleted: false },
+    diff: [],
     both_allowed: both,
     reason: null,
   });
@@ -193,12 +195,6 @@ describe("同步状态", () => {
     excluded: [],
     excluded_cascade: [],
   };
-
-  it("事件里的那一份：放在 view 里、平铺在事件上都认", () => {
-    expect(viewOf({ kind: "sync_status", id: 1, view, at_ms: 1 })).toBe(view);
-    const flat = { kind: "sync_status", ...view } as unknown as Parameters<typeof viewOf>[0];
-    expect(viewOf(flat).state).toBe("unreachable");
-  });
 
   it("关着才算没开；忽略的印记随下一次出事换掉", () => {
     expect(syncOn(view)).toBe(true);

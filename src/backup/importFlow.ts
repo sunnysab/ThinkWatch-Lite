@@ -5,7 +5,7 @@
  *
  * 纯逻辑，不碰界面：对话框按它画、按它判断「导入」按不按得下去。
  */
-import type { ImportAction, ImportDecision, ImportRow, ItemKind } from "@/types";
+import type { ImportAction, ImportDecision, ImportRow, ItemKind, ItemRef } from "@/types";
 import { refKey } from "./items";
 
 /** 一行此刻选的处理。`action` 为 null：冲突还没选 */
@@ -60,7 +60,7 @@ export function actionsFor(r: ImportRow): ImportAction[] {
 }
 
 function renamable(kind: ItemKind): boolean {
-  return kind !== "global" && kind !== "route_order" && kind !== "client_prefs";
+  return !["global", "provider_order", "route_order", "plugin_order", "client_prefs"].includes(kind);
 }
 
 /** 「全部覆盖」「全部改名导入」「全部跳过」：只改冲突的行；不能改名的行在「全部改名导入」时不动 */
@@ -74,9 +74,43 @@ export function bulk(rows: readonly ImportRow[], choices: Choices, action: "over
   return out;
 }
 
-/** 还没选处理方式的冲突有几项 */
+/**
+ * 引用了不导入的项目、因而也导不进来的行（规格 5.4）：配置包里新增的项目跳过了或者本身不可
+ * 导入，引用它的路由、别名、策略组随之不可导入 —— 本机没有同名的可以引用。改名导入的不算
+ * （引用跟着改名），本机已有同名的（相同、冲突）也不算。一层层传下去。交回：行 → 缺的那一项
+ */
+export function blocked(rows: readonly ImportRow[], choices: Choices): Record<string, ItemRef> {
+  const byKey = new Map(rows.map((r) => [refKey(r.item), r]));
+  const out: Record<string, ItemRef> = {};
+  const missing = (x: ItemRef) => {
+    const k = refKey(x);
+    const r = byKey.get(k);
+    if (!r) return false;
+    if (r.status === "error") return true;
+    return r.status === "new" && (choices[k]?.action === "skip" || out[k] !== undefined);
+  };
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const r of rows) {
+      const k = refKey(r.item);
+      if (out[k] || (r.status !== "new" && r.status !== "conflict") || choices[k]?.action === "skip") continue;
+      const miss = r.refs.find(missing);
+      if (miss) {
+        out[k] = miss;
+        changed = true;
+      }
+    }
+  }
+  return out;
+}
+
+/** 还没选处理方式的冲突有几项（因为引用而不可导入的不算：它没得选） */
 export function unresolved(rows: readonly ImportRow[], choices: Choices): number {
-  return rows.filter((r) => r.status === "conflict" && choices[refKey(r.item)]?.action == null).length;
+  const stuck = blocked(rows, choices);
+  return rows.filter((r) => {
+    const k = refKey(r.item);
+    return r.status === "conflict" && choices[k]?.action == null && !stuck[k];
+  }).length;
 }
 
 /**
@@ -89,7 +123,8 @@ export function nameProblems(
   taken: ReadonlyMap<ItemKind, ReadonlySet<string>>,
 ): Record<string, "empty" | "taken"> {
   const out: Record<string, "empty" | "taken"> = {};
-  const renames = rows.filter((r) => choices[refKey(r.item)]?.action === "rename");
+  const stuck = blocked(rows, choices);
+  const renames = rows.filter((r) => choices[refKey(r.item)]?.action === "rename" && !stuck[refKey(r.item)]);
   for (const r of renames) {
     const k = refKey(r.item);
     const name = (choices[k]?.name ?? "").trim();
@@ -107,12 +142,21 @@ export function nameProblems(
   return out;
 }
 
-/** 交给 core 的逐项处理：新增与冲突的行各一条（跳过的也交，core 照它不动） */
+/**
+ * 交给 core 的逐项处理：新增与冲突的行各一条（跳过的也交，core 照它不动）。因为引用而不可
+ * 导入的交「跳过」
+ */
 export function decisions(rows: readonly ImportRow[], choices: Choices): ImportDecision[] {
   const out: ImportDecision[] = [];
+  const stuck = blocked(rows, choices);
   for (const r of rows) {
     if (r.status !== "new" && r.status !== "conflict") continue;
-    const c = choices[refKey(r.item)];
+    const k = refKey(r.item);
+    if (stuck[k]) {
+      out.push({ item: r.item, action: "skip" });
+      continue;
+    }
+    const c = choices[k];
     if (!c?.action) continue;
     out.push(
       c.action === "rename"

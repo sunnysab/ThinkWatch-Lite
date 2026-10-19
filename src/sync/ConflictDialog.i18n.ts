@@ -3,7 +3,10 @@ import { messages } from "@/i18n";
 export const conflictText = messages(
   {
     title: "同步冲突",
-    desc: "以下对象在本机与其他设备上被修改为不同内容。未处理前，本机保留当前内容。",
+    desc: "以下对象在本机与其他设备上被修改为不同内容。未处理前，本机保留当前内容。点击对象名称查看差异。",
+    showDiff: "查看差异",
+    hideDiff: "收起差异",
+    deleted: "已删除",
     object: "对象",
     here: "本机",
     other: "其他设备",
@@ -26,7 +29,10 @@ export const conflictText = messages(
   },
   {
     title: "Sync conflicts",
-    desc: "These items were changed differently on this device and on another one. Until resolved, this device keeps its own version.",
+    desc: "These items were changed differently on this device and on another one. Until resolved, this device keeps its own version. Click an item to see the differences.",
+    showDiff: "Show differences",
+    hideDiff: "Hide differences",
+    deleted: "Deleted",
     object: "Item",
     here: "This device",
     other: "Other device",

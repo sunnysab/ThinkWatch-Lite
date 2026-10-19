@@ -48,6 +48,7 @@ export const backupText = messages(
       export: "导出",
       share: "分享",
       rotation: "凭据轮换",
+      other: "其他",
     },
 
     // ------------------------------------------------------------ 项目
@@ -62,7 +63,9 @@ export const backupText = messages(
       security_rule: "安全规则",
       plugin: "插件",
       global: "全局设置",
+      provider_order: "上游顺序",
       route_order: "路由顺序",
+      plugin_order: "插件顺序",
       client_prefs: "Lite 通用偏好",
     },
     globals: {
@@ -116,7 +119,8 @@ export const backupText = messages(
     passphraseShort: "口令至少 8 个字符。",
     passphraseMismatch: "两次输入的口令不一致。",
     omitted: "不随文件导出",
-    omitChatgpt: (n: number) => `ChatGPT 登录（${n} 个上游），导入后需重新登录。`,
+    /** ChatGPT 账号和 OAuth 上游的登录凭据留在本机 */
+    omitLogins: (n: number) => `ChatGPT 账号与 OAuth 的登录凭据（${n} 个上游），导入后需重新登录或填写。`,
     omitSecrets: "上游密钥、网关密钥与代理密码。导入后上游为停用状态，须补填密钥；网关密钥重新生成。",
     omitLocal: "监听、远程控制与同步设置。",
     omitData: "请求记录。",
@@ -157,7 +161,7 @@ export const backupText = messages(
     flagHints: {
       missing_key: "导入后为停用状态，须补填密钥",
       needs_login: "导入后为停用状态，须重新登录",
-      plugin_disabled: "导入后为停用状态",
+      plugin_disabled: "导入后为停用状态；可改写工具调用的插件启用时须批准",
     },
     doImport: "导入",
     overwrite: "覆盖",
@@ -173,6 +177,10 @@ export const backupText = messages(
     allSame: "配置包中的项目与当前配置相同。",
     sameHidden: (n: number) => `另有 ${n} 项与当前配置相同，不再列出。`,
     imported: (n: number) => `已导入 ${n} 项`,
+    /** 引用的项目不导入，这一项也导不进来 */
+    refSkipped: (kind: string, name: string) => `引用的${kind}「${name}」不导入`,
+    /** 较旧版本写的、这一版读不进来的几处，按一键修复的规矩修好了 */
+    repaired: (n: number) => `${n} 处内容由较旧版本写入，已按一键修复的规则修正：`,
     stale: "配置在预览之后已被修改，须重新预览。",
     previewAgain: "重新预览",
 
@@ -242,6 +250,7 @@ export const backupText = messages(
       export: "Export",
       share: "Share",
       rotation: "Credential rotation",
+      other: "Other",
     },
 
     kinds: {
@@ -255,7 +264,9 @@ export const backupText = messages(
       security_rule: "Security rules",
       plugin: "Plugins",
       global: "Global settings",
+      provider_order: "Upstream order",
       route_order: "Route order",
+      plugin_order: "Plugin order",
       client_prefs: "Lite preferences",
     },
     globals: {
@@ -305,8 +316,8 @@ export const backupText = messages(
     passphraseShort: "The passphrase has at least 8 characters.",
     passphraseMismatch: "The two passphrases differ.",
     omitted: "Not exported",
-    omitChatgpt: (n: number) =>
-      `ChatGPT sign-in (${s(n, "upstream", "upstreams")}); sign in again after importing.`,
+    omitLogins: (n: number) =>
+      `ChatGPT account and OAuth sign-ins (${s(n, "upstream", "upstreams")}); sign in or fill them in again after importing.`,
     omitSecrets:
       "Upstream keys, gateway keys and proxy passwords. Imported upstreams stay disabled until their keys are filled in; gateway keys are generated anew.",
     omitLocal: "Listening, remote control and sync settings.",
@@ -347,7 +358,7 @@ export const backupText = messages(
     flagHints: {
       missing_key: "Imported disabled until the key is filled in",
       needs_login: "Imported disabled until signed in again",
-      plugin_disabled: "Imported disabled",
+      plugin_disabled: "Imported disabled; a plugin that rewrites tool calls needs approval when enabled",
     },
     doImport: "Import",
     overwrite: "Overwrite",
@@ -365,6 +376,11 @@ export const backupText = messages(
     sameHidden: (n: number) =>
       n === 1 ? "1 more item matches the current config and is not listed." : `${n} more items match the current config and are not listed.`,
     imported: (n: number) => `Imported ${s(n, "item", "items")}`,
+    refSkipped: (kind: string, name: string) => `References ${name} (${kind.toLowerCase()}), which is not imported`,
+    repaired: (n: number) =>
+      n === 1
+        ? "1 entry written by an older version was fixed the way one-click repair fixes it:"
+        : `${n} entries written by an older version were fixed the way one-click repair fixes them:`,
     stale: "The config changed after the preview. Preview again.",
     previewAgain: "Preview again",
 

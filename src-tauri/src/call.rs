@@ -23,67 +23,11 @@
 //! （先认得这个客户端）。客户端接管、MCP、扫描本来就不经过 core，见 `clients`。
 
 use serde_json::Value;
-use tw_api::Endpoint;
-
-/// 白名单按名字在这里找端点：钉着的 tw-api 里的，加上 core 还没发版的同步那几个
-/// （TEMP until core v0.77：发版之后删掉第一行，`ep` 换回 `tw_api::ep`）
-mod ep {
-    pub use crate::sync::ep::*;
-    pub use tw_api::ep::*;
-}
+use tw_api::{Endpoint, ep};
 
 use crate::AppState;
 use crate::control::ControlClient;
 use crate::error::{CmdError, Out};
-
-/// 界面能调的端点：钉着的那版 tw-api 的，加上 core 还没发版的那几个（[`pending`]）。
-mod ep {
-    pub use super::pending::*;
-    pub use tw_api::ep::*;
-}
-
-/// TEMP until core v0.77：配置包、导入导出与备份的端点（同步与备份约定 2.1）。core 发版之前
-/// 钉着的 tw-api 里还没有它们，先按约定的方法和路径在这里描述，请求与响应原样转发（类型在
-/// `src/generated/tw-api.ts` 里手写）。**钉上 v0.77 时整块删掉**：留着的话 `ep::` 下同名的两个
-/// 类型会撞在一起，编不过。
-mod pending {
-    use serde_json::Value;
-    use tw_api::{Endpoint, Format, Method};
-
-    macro_rules! pending {
-        ($($name:ident: $method:ident $path:literal, $req:ty;)*) => {
-            $(
-                #[derive(Debug, Clone, Copy)]
-                pub struct $name;
-
-                impl Endpoint for $name {
-                    const METHOD: Method = Method::$method;
-                    const PATH: &'static str = $path;
-                    const PARAMS: &'static [&'static str] = &[];
-                    const FORMAT: Format = Format::Json;
-                    const NAME: &'static str = stringify!($name);
-                    type Req = $req;
-                    type Res = Value;
-                }
-            )*
-
-            /// 这几个端点，和 `tw_api::ep::ALL` 同一种描述（测试核对路径）
-            #[cfg(test)]
-            pub const PENDING: &[(&str, Method, &str)] = &[$((stringify!($name), Method::$method, $path)),*];
-        };
-    }
-
-    pending! {
-        ConfigItems: Get "/config/items", ();
-        ExportConfig: Post "/config/export", Value;
-        ImportPreview: Post "/config/import/preview", Value;
-        ImportConfig: Post "/config/import", Value;
-        Backups: Get "/backups", ();
-        BackupFile: Post "/backups/file", Value;
-        RestorePreview: Post "/backups/preview", Value;
-        Restore: Post "/backups/restore", Value;
-    }
-}
 
 macro_rules! webview_endpoints {
     ($($name:ident),* $(,)?) => {
@@ -227,8 +171,8 @@ webview_endpoints![
     ReorderPlugins,
     TrialPlugin,
     PluginLogs,
-    // 导入导出与备份（TEMP until core v0.77，见 `pending`）：配置里有哪些项目、导出、导入的
-    // 预览与写入；备份版本的列表、另存、恢复的预览与写入
+    // 导入导出与备份：配置里有哪些项目、导出、导入的预览与写入；备份版本的列表、另存、
+    // 恢复的预览与写入。备份的几个在安全模式下照样能用
     ConfigItems,
     ExportConfig,
     ImportPreview,
@@ -237,7 +181,7 @@ webview_endpoints![
     BackupFile,
     RestorePreview,
     Restore,
-    // 同步（TEMP until core v0.77）。固定密钥、通用偏好只经过 Rust（`sync`、`client_prefs`）
+    // 同步。固定密钥、通用偏好只经过 Rust（`sync`、`client_prefs`）
     SyncStatus,
     SyncTest,
     SyncJoinPreview,
@@ -341,31 +285,6 @@ mod tests {
         }
         for name in ["Backups", "BackupFile", "RestorePreview", "Restore"] {
             assert!(ALLOWED.contains(&name), "{name}");
-        }
-    }
-
-    /// TEMP until core v0.77：还没发版的那几个端点，方法和路径照约定；钉着的 tw-api 里还没有
-    /// 同名的（有了就该删掉 `pending`，改用 tw-api 的）
-    #[test]
-    fn the_pending_endpoints_follow_the_contract() {
-        use tw_api::Method;
-        let want = [
-            ("ConfigItems", Method::Get, "/config/items"),
-            ("ExportConfig", Method::Post, "/config/export"),
-            ("ImportPreview", Method::Post, "/config/import/preview"),
-            ("ImportConfig", Method::Post, "/config/import"),
-            ("Backups", Method::Get, "/backups"),
-            ("BackupFile", Method::Post, "/backups/file"),
-            ("RestorePreview", Method::Post, "/backups/preview"),
-            ("Restore", Method::Post, "/backups/restore"),
-        ];
-        assert_eq!(pending::PENDING, &want[..]);
-        for (name, ..) in want {
-            assert!(ALLOWED.contains(&name), "{name}");
-            assert!(
-                !tw_api::ep::ALL.iter().any(|e| e.name == name),
-                "{name} 已在钉着的 tw-api 里：删掉 call.rs 里的 pending"
-            );
         }
     }
 

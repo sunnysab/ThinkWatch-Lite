@@ -294,7 +294,7 @@ export function applyEvent(rows: Map<number, RequestRow>, ev: CoreEvent): void {
     case "auth_changed":
     case "credential_expired":
     case "events_dropped":
-    // 同步的状态、网关密钥换了值、通用偏好变了（TEMP until core v0.77：协议 50 的三种）
+    // 同步的状态、网关密钥换了值、通用偏好变了（协议 50）
     case "sync_status":
     case "gateway_keys_changed":
     case "client_prefs_changed":

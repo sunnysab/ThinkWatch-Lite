@@ -2,7 +2,7 @@
  * 两处要逐项选的：加入同步时的合并（和导入同一套规则，方案 5.3、5.4），和同步冲突
  * （6.7）。只是记哪一项选了什么、写成交给 core 的样子、还差几项没选。纯函数，导出给测试。
  */
-import type { ImportDecision, ImportRow, ItemRef, SyncConflict, SyncResolveDecision, SyncTake } from "@/types";
+import type { ImportDecision, ImportRow, ItemRef, SyncConflict, SyncConflictDecision, SyncTake } from "@/types";
 
 export const refKey = (r: ItemRef) => `${r.kind}\u0000${r.name}`;
 
@@ -130,8 +130,8 @@ export function keepBothProblem(c: SyncConflict, p: ConflictPick | undefined): "
 }
 
 /** 交给 core 的：**只交选了的**，没选的留到下次（「稍后处理」） */
-export function resolveDecisions(list: readonly SyncConflict[], picks: ConflictPicks): SyncResolveDecision[] {
-  const out: SyncResolveDecision[] = [];
+export function resolveDecisions(list: readonly SyncConflict[], picks: ConflictPicks): SyncConflictDecision[] {
+  const out: SyncConflictDecision[] = [];
   for (const c of list) {
     const p = picks[c.id];
     if (!p?.take || keepBothProblem(c, p)) continue;

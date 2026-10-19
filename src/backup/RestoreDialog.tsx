@@ -16,6 +16,7 @@ import { whenMinute } from "@/format";
 import { PluginConfirmNotice } from "@/ConfigText";
 import { needsConfirmation } from "@/plugins/write";
 import { DialogError } from "@/upstreams/parts";
+import { FixList } from "@/repair";
 import type { BackupEntry, RestorePreview, RestoreRow } from "@/types";
 import { BACKUPS_KEY, backupApi } from "./api";
 import { backupText } from "./backup.i18n";
@@ -130,21 +131,28 @@ export function RestoreDialog({
             empty={<p className="py-6 text-center tw-body text-muted-foreground">{t.unchanged}</p>}
           >
             {(d) => (
-              <ChangesTable
-                rows={d.rows}
-                unchecked={unchecked}
-                disabled={busy}
-                onToggle={(keys, on) =>
-                  setUnchecked((u) => {
-                    const next = new Set(u);
-                    for (const k of keys) {
-                      if (on) next.delete(k);
-                      else next.add(k);
-                    }
-                    return next;
-                  })
-                }
-              />
+              <>
+                {d.repairs.length > 0 && (
+                  <Banner layout="inline" tone="info" title={t.repaired(d.repairs.length)} className="mt-3">
+                    <FixList fixes={d.repairs} />
+                  </Banner>
+                )}
+                <ChangesTable
+                  rows={d.rows}
+                  unchecked={unchecked}
+                  disabled={busy}
+                  onToggle={(keys, on) =>
+                    setUnchecked((u) => {
+                      const next = new Set(u);
+                      for (const k of keys) {
+                        if (on) next.delete(k);
+                        else next.add(k);
+                      }
+                      return next;
+                    })
+                  }
+                />
+              </>
             )}
           </Loadable>
         </div>

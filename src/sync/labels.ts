@@ -14,7 +14,9 @@ export function itemLabel(r: ItemRef): string {
   switch (r.kind) {
     case "global":
       return t.global[r.name] ?? t.named(t.kind.global, r.name);
+    case "provider_order":
     case "route_order":
+    case "plugin_order":
     case "client_prefs":
       return t.kind[r.kind];
     case "security_rule": {

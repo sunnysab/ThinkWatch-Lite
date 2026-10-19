@@ -395,7 +395,6 @@ pub(crate) async fn bridge_events(app: tauri::AppHandle) {
         }
         let opened = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (a, b, o) = (app.clone(), app.clone(), opened.clone());
-        let x = app.clone();
         let resumed = connected_before;
         let sub = client.subscribe_events(
             move || {
@@ -469,12 +468,9 @@ pub(crate) async fn bridge_events(app: tauri::AppHandle) {
                         }
                     });
                 }
+                // 同步的三种：要人处理的状态发通知、改写接管着的客户端的密钥、读回通用偏好
+                crate::sync::on_event(&a, &ev);
                 let _ = a.emit("core-event", &ev);
-            },
-            // 同步的三种事件（TEMP until core v0.77）：这边要做的做完，原样交给界面
-            move |extra| {
-                crate::sync::on_extra(&x, &extra);
-                let _ = x.emit("core-event", &extra.raw);
             },
         );
         let switched = match until_switched(sub, &mut moved).await {

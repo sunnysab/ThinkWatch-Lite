@@ -3,7 +3,7 @@
  * `ItemRef`：类别 + 名字）。这里是它们在界面上的叫法、排法，和导出时「随附」的算法。
  */
 import { textOf } from "@/i18n";
-import type { Guard, ItemKind, ItemNode, ItemRef, PackOrigin } from "@/types";
+import type { ConfigOrigin, Guard, ItemKind, ItemNode, ItemRef, PackOrigin } from "@/types";
 import { backupText } from "./backup.i18n";
 
 /** 列表里各类的先后：和导出对话框里的分组一样 */
@@ -18,13 +18,18 @@ export const KIND_ORDER: readonly ItemKind[] = [
   "security_rule",
   "plugin",
   "global",
+  "provider_order",
   "route_order",
+  "plugin_order",
   "client_prefs",
 ];
 
-/** 列表里当一类显示的：路由顺序、Lite 通用偏好并进「全局设置」那一组 */
+/** 不按名字、整份一项的几类：几样东西的先后、Lite 的通用偏好 */
+const WHOLE: readonly ItemKind[] = ["provider_order", "route_order", "plugin_order", "client_prefs"];
+
+/** 列表里当一类显示的：几样东西的先后、Lite 通用偏好并进「全局设置」那一组 */
 export function groupOf(kind: ItemKind): ItemKind {
-  return kind === "route_order" || kind === "client_prefs" ? "global" : kind;
+  return WHOLE.includes(kind) ? "global" : kind;
 }
 
 /** 一个项目的键：类别里没有 `:`，所以第一个 `:` 之后都是名字 */
@@ -52,7 +57,9 @@ export function itemLabel(r: ItemRef): string {
   switch (r.kind) {
     case "global":
       return (t.globals as Record<string, string | undefined>)[r.name] ?? r.name;
+    case "provider_order":
     case "route_order":
+    case "plugin_order":
     case "client_prefs":
       return t.kinds[r.kind];
     case "security_rule": {
@@ -70,11 +77,11 @@ export function itemLabel(r: ItemRef): string {
 
 /** 名字是配置里的标识（上游名、路由名……）：等宽字体写。全局设置、安全规则写的是界面上的叫法 */
 export function namedById(r: ItemRef): boolean {
-  return !["global", "route_order", "client_prefs", "security_rule"].includes(r.kind);
+  return r.kind !== "global" && r.kind !== "security_rule" && !WHOLE.includes(r.kind);
 }
 
 /** 一版备份是谁写的：同步来的写上是哪台设备 */
-export function originLabel(origin: PackOrigin | "rotation", device: string | null): string {
+export function originLabel(origin: PackOrigin | ConfigOrigin, device: string | null): string {
   const t = textOf(backupText).origins;
   if (origin === "sync") return device ? t.syncFrom(device) : t.sync;
   return t[origin];

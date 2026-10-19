@@ -10,127 +10,28 @@
 //!   恢复要删的时候，core 据此保留它们；
 //! - **打开主窗口时立刻同步一次**（6.5）；
 //! - 选同步文件夹的系统对话框、本机的计算机名（设备名称的缺省值）。
-//!
-//! # TEMP until core v0.77
-//!
-//! 钉着的 tw-api（v0.76.0）里还没有同步的端点和事件。在那之前：
-//!
-//! - [`ep`] 是手写的端点（请求、响应都按 JSON 原样转），`call` 的白名单按名字找到它们；
-//! - 事件流上这一版认不出的三种（`sync_status`、`gateway_keys_changed`、
-//!   `client_prefs_changed`）由 [`Extra::parse`] 认，原样转给界面。
-//!
-//! 换成 v0.77 之后：删掉 [`ep`] 和 [`Extra`]，改用 `tw_api::ep::Sync*` 和
-//! `tw_api::Event::{SyncStatus, GatewayKeysChanged, ClientPrefsChanged}`。
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::Manager;
-use tw_api::Msg;
+use tw_api::{Msg, SyncState, SyncView};
 
 use crate::AppState;
 use crate::error::Out;
 use crate::notices::{self, Level, Signal};
 
-/// TEMP until core v0.77：同步、客户端偏好、固定密钥的端点。请求和响应都是 JSON 原样
-pub mod ep {
-    use serde_json::Value;
-    use tw_api::{Endpoint, Format, Method};
-
-    macro_rules! temp_endpoints {
-        ($($name:ident: $method:ident $path:literal, $req:ty;)*) => {
-            $(
-                #[derive(Debug, Clone, Copy)]
-                pub struct $name;
-
-                impl Endpoint for $name {
-                    const METHOD: Method = Method::$method;
-                    const PATH: &'static str = $path;
-                    const PARAMS: &'static [&'static str] = &[];
-                    const FORMAT: Format = Format::Json;
-                    const NAME: &'static str = stringify!($name);
-                    type Req = $req;
-                    type Res = Value;
-                }
-            )*
-
-            /// 这几个端点的名字（测试核对和前端的清单一致）
-            #[cfg(test)]
-            pub const NAMES: &[&str] = &[$(stringify!($name)),*];
-        };
-    }
-
-    temp_endpoints! {
-        GetClientPrefs: Get "/client-prefs", ();
-        PutClientPrefs: Put "/client-prefs", Value;
-        PinKeys: Put "/pinned-keys", Value;
-        SyncStatus: Get "/sync", ();
-        SyncTest: Post "/sync/test", Value;
-        SyncJoinPreview: Post "/sync/enable/preview", Value;
-        SyncEnable: Post "/sync/enable", Value;
-        SyncSave: Put "/sync/settings", Value;
-        SyncNow: Post "/sync/now", ();
-        SyncConflicts: Get "/sync/conflicts", ();
-        SyncResolve: Post "/sync/conflicts", Value;
-        SyncEncryption: Post "/sync/encryption", Value;
-        SyncUnlock: Post "/sync/unlock", Value;
-        SyncDisable: Post "/sync/disable", Value;
-    }
-}
-
-/// TEMP until core v0.77：事件流上钉着的 tw-api 认不出的三种。`raw` 原样转给界面
-#[derive(Debug, Clone, PartialEq)]
-pub struct Extra {
-    pub kind: ExtraKind,
-    pub raw: serde_json::Value,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExtraKind {
-    SyncStatus(Brief),
-    GatewayKeysChanged(Vec<String>),
-    ClientPrefsChanged,
-}
-
-impl Extra {
-    /// 认一条事件。不是这三种之一就是 `None`（和以前一样丢掉）
-    pub fn parse(data: &str) -> Option<Self> {
-        let raw: serde_json::Value = serde_json::from_str(data).ok()?;
-        let kind = match raw.get("kind")?.as_str()? {
-            // 事件写成 `SyncStatus(SyncView)`：字段可能平铺在事件上，也可能在 `view` 里
-            "sync_status" => ExtraKind::SyncStatus(
-                serde_json::from_value(raw.get("view").unwrap_or(&raw).clone()).ok()?,
-            ),
-            "gateway_keys_changed" => ExtraKind::GatewayKeysChanged(
-                serde_json::from_value(raw.get("names")?.clone()).ok()?,
-            ),
-            "client_prefs_changed" => ExtraKind::ClientPrefsChanged,
-            _ => return None,
-        };
-        Some(Self { kind, raw })
-    }
-}
-
-/// `SyncView` 里通知要看的那几项（TEMP：换成 `tw_api::SyncView`）
-#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize)]
-pub struct Brief {
-    pub state: String,
-    #[serde(default)]
-    pub error: Option<Msg>,
-    #[serde(default)]
-    pub conflicts: u32,
-}
-
-/// 事件流上来了一条（`gateway` 的事件桥调）。界面那一份由调用方转发
-pub fn on_extra(app: &tauri::AppHandle, x: &Extra) {
-    match &x.kind {
-        ExtraKind::SyncStatus(b) => tell(app, b),
-        ExtraKind::GatewayKeysChanged(names) => {
+/// 事件流上同步那三种（`gateway` 的事件桥调）。界面那一份由调用方照常转发
+pub fn on_event(app: &tauri::AppHandle, ev: &tw_api::Event) {
+    match ev {
+        tw_api::Event::SyncStatus { view, .. } => tell(app, view),
+        tw_api::Event::GatewayKeysChanged { names, .. } => {
             let (app, names) = (app.clone(), names.clone());
             tauri::async_runtime::spawn(async move { keys_changed(&app, names).await });
         }
-        ExtraKind::ClientPrefsChanged => crate::client_prefs::pull_soon(app),
+        tw_api::Event::ClientPrefsChanged { .. } => crate::client_prefs::pull_soon(app),
+        _ => {}
     }
 }
 
@@ -144,12 +45,8 @@ pub fn on_link(app: &tauri::AppHandle) {
         let Some(st) = app.try_state::<AppState>() else {
             return;
         };
-        match st.control.call::<ep::SyncStatus>(&[], &()).await {
-            Ok(v) => match serde_json::from_value::<Brief>(v) {
-                Ok(b) => tell(&app, &b),
-                Err(e) => tracing::debug!("同步状态读不懂：{e}"),
-            },
-            // 旧版 core 没有这个端点：没有同步可言
+        match st.control.call::<tw_api::ep::SyncStatus>(&[], &()).await {
+            Ok(v) => tell(&app, &v),
             Err(e) => tracing::debug!("没问到同步状态：{e:#}"),
         }
     });
@@ -170,7 +67,7 @@ const KEYS: [&str; 5] = [
 type Said = BTreeMap<&'static str, (String, String)>;
 
 /// 这一份同步状态该开着哪几条、各怎么说
-pub fn wanted(b: &Brief) -> Said {
+pub fn wanted(b: &SyncView) -> Said {
     let mut out = Said::new();
     // 冲突和状态分开看：连不上的时候冲突照样还在
     if b.conflicts > 0 {
@@ -199,8 +96,8 @@ pub fn wanted(b: &Brief) -> Said {
         .as_ref()
         .map(crate::core_text::clause)
         .unwrap_or_default();
-    let said: Option<(&'static str, String, String)> = match b.state.as_str() {
-        "unreachable" => Some((
+    let said: Option<(&'static str, String, String)> = match b.state {
+        SyncState::Unreachable => Some((
             "sync:unreachable",
             tr!("无法连接同步位置", "Sync Location Unreachable").to_string(),
             if why.is_empty() {
@@ -218,7 +115,7 @@ pub fn wanted(b: &Brief) -> Said {
                 )
             },
         )),
-        "auth_failed" => Some((
+        SyncState::AuthFailed => Some((
             "sync:auth",
             tr!("同步位置拒绝访问", "Sync Location Denied Access").to_string(),
             tr!(
@@ -227,7 +124,7 @@ pub fn wanted(b: &Brief) -> Said {
             )
             .to_string(),
         )),
-        "locked" => Some((
+        SyncState::Locked => Some((
             "sync:locked",
             tr!(
                 "同步口令已在其他设备上更改",
@@ -240,7 +137,7 @@ pub fn wanted(b: &Brief) -> Said {
             )
             .to_string(),
         )),
-        "too_new" => Some((
+        SyncState::TooNew => Some((
             "sync:too_new",
             tr!("同步已暂停", "Sync Paused").to_string(),
             tr!(
@@ -286,7 +183,7 @@ pub fn changes(before: Option<&Said>, now: &Said) -> Vec<Signal> {
 /// 通知点开落在哪：设置的「同步与备份」一节
 pub const SYNC_VIEW: &str = "settings:sync-backup";
 
-fn tell(app: &tauri::AppHandle, b: &Brief) {
+fn tell(app: &tauri::AppHandle, b: &SyncView) {
     let Some(n) = app.try_state::<std::sync::Arc<notices::Notices>>() else {
         return;
     };
@@ -443,7 +340,12 @@ async fn report_pinned(app: &tauri::AppHandle) -> Out<Vec<String>> {
         .map_err(crate::error::text)?;
     let names = crate::clients::blocking(move || crate::clients::pinned_keys(&keys)).await?;
     st.control
-        .call::<ep::PinKeys>(&[], &serde_json::json!({ "names": names }))
+        .call::<tw_api::ep::PinKeys>(
+            &[],
+            &tw_api::PinnedKeys {
+                names: names.clone(),
+            },
+        )
         .await
         .map_err(crate::error::text)?;
     Ok(names)
@@ -477,7 +379,7 @@ pub fn nudge(app: &tauri::AppHandle) {
         let Some(st) = app.try_state::<AppState>() else {
             return;
         };
-        if let Err(e) = st.control.call::<ep::SyncNow>(&[], &()).await {
+        if let Err(e) = st.control.call::<tw_api::ep::SyncNow>(&[], &()).await {
             tracing::debug!("打开窗口时没同步上：{e:#}");
         }
     });
@@ -579,11 +481,19 @@ fn computer_name() -> String {
 mod tests {
     use super::*;
 
-    fn brief(state: &str, conflicts: u32) -> Brief {
-        Brief {
-            state: state.into(),
+    fn brief(state: &str, conflicts: u32) -> SyncView {
+        SyncView {
+            state: SyncState::from_slug(state).unwrap(),
+            target: None,
+            encrypted: false,
+            device: None,
+            last_synced_ms: None,
+            failing_since_ms: None,
             error: None,
+            devices: vec![],
             conflicts,
+            excluded: vec![],
+            excluded_cascade: vec![],
         }
     }
 
@@ -592,32 +502,6 @@ mod tests {
             .iter()
             .map(|s| (s.key.clone(), s.change == notices::Change::Raised))
             .collect()
-    }
-
-    /// 三种事件按 `kind` 认出来；状态在事件上平铺的、放在 `view` 里的都认
-    #[test]
-    fn the_three_new_events_are_recognised() {
-        let x = Extra::parse(
-            r#"{"kind":"sync_status","id":3,"view":{"state":"conflict","conflicts":2},"at_ms":1}"#,
-        )
-        .unwrap();
-        assert_eq!(x.kind, ExtraKind::SyncStatus(brief("conflict", 2)));
-        let x = Extra::parse(r#"{"kind":"sync_status","state":"idle","conflicts":0}"#).unwrap();
-        assert_eq!(x.kind, ExtraKind::SyncStatus(brief("idle", 0)));
-        let x = Extra::parse(
-            r#"{"kind":"gateway_keys_changed","id":4,"names":["codex","default"],"at_ms":1}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            x.kind,
-            ExtraKind::GatewayKeysChanged(vec!["codex".into(), "default".into()])
-        );
-        assert_eq!(x.raw["id"], 4);
-        let x = Extra::parse(r#"{"kind":"client_prefs_changed","id":5,"at_ms":1}"#).unwrap();
-        assert_eq!(x.kind, ExtraKind::ClientPrefsChanged);
-        // 别的照旧丢掉
-        assert_eq!(Extra::parse(r#"{"kind":"made_up","id":1}"#), None);
-        assert_eq!(Extra::parse("not json"), None);
     }
 
     /// 正常运转什么都不说；需要处理的才开一条，好了收起
@@ -668,9 +552,12 @@ mod tests {
     /// 前端的清单里有这几个同步端点（`PinKeys`、客户端偏好的两个只给 Rust 用）
     #[test]
     fn the_webview_reaches_the_sync_endpoints_but_not_the_pins() {
-        for name in ep::NAMES {
-            let webview = crate::call::ALLOWED.contains(name);
-            let rust_only = matches!(*name, "PinKeys" | "GetClientPrefs" | "PutClientPrefs");
+        let names = tw_api::ep::ALL.iter().map(|e| e.name).filter(|n| {
+            n.starts_with("Sync") || matches!(*n, "PinKeys" | "GetClientPrefs" | "PutClientPrefs")
+        });
+        for name in names {
+            let webview = crate::call::ALLOWED.contains(&name);
+            let rust_only = matches!(name, "PinKeys" | "GetClientPrefs" | "PutClientPrefs");
             assert_eq!(webview, !rust_only, "{name}");
         }
     }

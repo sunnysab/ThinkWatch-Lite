@@ -17,6 +17,7 @@ import { commonText } from "@/i18n/common.i18n";
 import { DialogError } from "@/upstreams/parts";
 import { errorText } from "@/i18n/core.i18n";
 import type { ItemNode, ItemRef, ProviderView } from "@/types";
+import { useRemote } from "@/connection/useRemote";
 import { backupApi } from "./api";
 import { backupText } from "./backup.i18n";
 import { closure, countOf, groupBy, itemLabel, kindLabel, namedById, refKey, refOf } from "./items";
@@ -49,6 +50,7 @@ export function ExportDialog({
   const t = useText(backupText);
   const c = useText(commonText);
   const items = useConfigItems();
+  const remote = useRemote() !== null;
   const [scope, setScope] = useState<"all" | "items">(preselect && preselect.length > 0 ? "items" : "all");
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set((preselect ?? []).map(refKey)));
   const [secrets, setSecrets] = useState(true);
@@ -58,8 +60,11 @@ export function ExportDialog({
 
   const nodes = items.data ?? [];
   const { included, along } = useMemo(() => closure(picked, nodes), [picked, nodes]);
-  const chatgpt = providers.filter(
-    (p) => p.protocol === "chatgpt" && (scope === "all" || included.has(refKey({ kind: "provider", name: p.name }))),
+  // 登录得来的凭据留在本机：ChatGPT 账号、OAuth 上游换发的令牌（core 的 `omitted_logins`）
+  const logins = providers.filter(
+    (p) =>
+      (p.protocol === "chatgpt" || p.oauth != null) &&
+      (scope === "all" || included.has(refKey({ kind: "provider", name: p.name }))),
   ).length;
   const empty = scope === "items" && included.size === 0;
   const ready = !empty && pass.problem === null && !(scope === "items" && items.data === undefined);
@@ -72,8 +77,8 @@ export function ExportDialog({
         scope: scope === "all" ? "all" : { items: [...included].map(refOf) },
         secrets,
         passphrase: pass.value,
-        // 远程模式下由 Lite 附上自己的通用偏好（规格 4.4）：形状由同步那一路定，接上之前不附
-        client_prefs: null,
+        // 远程模式下由 Lite 附上这台设备上的通用偏好（规格 4.4）；本机模式下 core 存着它
+        client_prefs: remote ? await backupApi.clientPrefs() : null,
       });
       const path = await backupApi.save(f);
       if (path) {
@@ -148,7 +153,7 @@ export function ExportDialog({
             <PassphraseRow p={pass} disabled={busy} />
             <FormRow label={t.omitted}>
               <ul className="flex flex-col gap-0.5 pt-1 tw-body text-muted-foreground">
-                {chatgpt > 0 && <li>{t.omitChatgpt(chatgpt)}</li>}
+                {logins > 0 && <li>{t.omitLogins(logins)}</li>}
                 {!secrets && <li>{t.omitSecrets}</li>}
                 <li>{t.omitLocal}</li>
                 <li>{t.omitData}</li>

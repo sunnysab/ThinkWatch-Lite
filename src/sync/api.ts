@@ -11,7 +11,7 @@ import type {
   ImportDecision,
   SyncEncryptionAction,
   SyncJoin,
-  SyncResolveDecision,
+  SyncConflictDecision,
   SyncSettingsSave,
   SyncTarget,
 } from "@/types";
@@ -31,7 +31,7 @@ export const syncApi = {
   save: (req: SyncSettingsSave) => call("SyncSave", req),
   now: () => call("SyncNow", null),
   conflicts: () => call("SyncConflicts", null),
-  resolve: (decisions: SyncResolveDecision[]) => call("SyncResolve", { decisions }),
+  resolve: (decisions: SyncConflictDecision[]) => call("SyncResolve", { decisions }),
   encryption: (action: SyncEncryptionAction, passphrase: string | null, newPassphrase: string | null) =>
     call("SyncEncryption", { action, passphrase, new_passphrase: newPassphrase }),
   unlock: (passphrase: string) => call("SyncUnlock", { passphrase }),

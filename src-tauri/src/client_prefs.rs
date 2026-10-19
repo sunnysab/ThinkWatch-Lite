@@ -164,13 +164,14 @@ async fn push(app: &tauri::AppHandle) -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("not ready"))?;
     let theirs = st
         .control
-        .call::<crate::sync::ep::GetClientPrefs>(&[], &())
+        .call::<tw_api::ep::GetClientPrefs>(&[], &())
         .await?;
     let p = prefs::load(&data_dir());
-    let body =
-        serde_json::json!({ "prefs": merged(&p, theirs.get("prefs").filter(|v| !v.is_null())) });
+    let body = tw_api::ClientPrefs {
+        prefs: Some(merged(&p, theirs.prefs.as_ref().filter(|v| !v.is_null()))),
+    };
     st.control
-        .call::<crate::sync::ep::PutClientPrefs>(&[], &body)
+        .call::<tw_api::ep::PutClientPrefs>(&[], &body)
         .await?;
     mark_pending(false);
     Ok(())
@@ -186,9 +187,9 @@ async fn pull(app: &tauri::AppHandle) -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("not ready"))?;
     let theirs = st
         .control
-        .call::<crate::sync::ep::GetClientPrefs>(&[], &())
+        .call::<tw_api::ep::GetClientPrefs>(&[], &())
         .await?;
-    match theirs.get("prefs").filter(|v| !v.is_null()) {
+    match theirs.prefs.as_ref().filter(|v| !v.is_null()) {
         // core 那边还没有：头一次，把这边的交上去
         None => push(app).await,
         Some(v) => {

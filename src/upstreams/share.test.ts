@@ -34,6 +34,7 @@ function view(patch: Partial<ProviderView> = {}): ProviderView {
     balance_setting: "auto",
     balance: null,
     signed_in: null,
+    sync_excluded: false,
     ...patch,
   };
 }

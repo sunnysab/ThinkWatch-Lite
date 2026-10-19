@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { call } from "@/control";
 import { cn } from "@/lib/utils";
 import { useResource } from "@/lib/resource";
@@ -10,6 +10,7 @@ import { StatusLabel, type StatusTone } from "@/ui/status-dot";
 import { Switch } from "@/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 import { useText } from "@/i18n";
+import { PartHeading } from "@/backup/parts";
 import { errorText } from "@/i18n/core.i18n";
 import { useNavParams } from "@/nav";
 import { useNow } from "@/useNow";
@@ -98,15 +99,6 @@ export function SyncPart() {
   );
 }
 
-/** 「同步」「备份」这两半各自的小标题，右边是这一半的操作 */
-function PartHeading({ title, actions }: { title: ReactNode; actions?: ReactNode }) {
-  return (
-    <div className="flex min-h-7 items-end gap-3">
-      <h3 className="min-w-0 flex-1 truncate tw-body font-medium text-muted-foreground">{title}</h3>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-    </div>
-  );
-}
 
 interface Draft {
   target: TargetDraft;
@@ -414,7 +406,9 @@ function Devices({ view }: { view: SyncView }) {
           {list.map((d) => (
             <TableRow key={d.id} className="hover:bg-transparent">
               <TableCell className="max-w-0 pl-4">
-                <span className="block truncate">{d.this ? t.thisDevice(d.name) : d.name}</span>
+                <span className="block truncate">
+                  {d.this ? t.thisDevice(d.name) : d.remote_core ? t.remoteCore(d.name) : d.name}
+                </span>
               </TableCell>
               <TableCell className="whitespace-nowrap text-muted-foreground tw-num">{ago(d.last_seen_ms, now)}</TableCell>
               <TableCell className="font-mono whitespace-nowrap text-muted-foreground">{d.core_version}</TableCell>

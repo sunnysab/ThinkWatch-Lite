@@ -6,7 +6,7 @@ export const syncFieldsText = messages(
     kinds: { folder: "文件夹", webdav: "WebDAV", s3: "S3 兼容存储" },
     folder: "文件夹",
     pick: "选择…",
-    folderHint: "iCloud Drive、Dropbox、OneDrive、Syncthing 等同步的文件夹均可。",
+    folderHint: "iCloud Drive、Dropbox、OneDrive、Syncthing 等同步的文件夹均可。同步数据直接存放在该文件夹中，建议使用专用文件夹。",
     folderRemoteHint: "服务器上的文件夹路径。",
     url: "地址",
     user: "用户名",
@@ -47,7 +47,8 @@ export const syncFieldsText = messages(
     kinds: { folder: "Folder", webdav: "WebDAV", s3: "S3-compatible" },
     folder: "Folder",
     pick: "Choose…",
-    folderHint: "Any folder synced by iCloud Drive, Dropbox, OneDrive, Syncthing or similar.",
+    folderHint:
+      "Any folder synced by iCloud Drive, Dropbox, OneDrive, Syncthing or similar. Sync data is stored directly in it, so a dedicated folder is best.",
     folderRemoteHint: "A folder path on the server.",
     url: "URL",
     user: "User name",
